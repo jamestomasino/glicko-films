@@ -67,6 +67,7 @@ export default {
 </script>
 <style lang="scss">
 .content {
+  position: static;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -78,9 +79,12 @@ export default {
   padding: 20px;
   font-size: 18px;
   line-height: 22px;
+  overflow: scroll;
 }
 h1 {
   margin-bottom: 2rem;
+  font-size: 36px;
+  line-height: 40px;
 }
 hr {
   margin-bottom: 2rem;
