@@ -82,7 +82,7 @@ export default {
   align-items: center;
   display: block;
   background: rgb(2,0,36);
-  background: linear-gradient(164deg, rgba(2,0,36,1) 0%, rgba(107,107,232,1) 35%, rgba(0,212,255,1) 100%);
+  background: linear-gradient(104deg, rgba(2,0,36,1) 0%, rgba(64,9,121,1) 35%, rgba(12,98,101,1) 100%); 
   height: 100vh;
   color: white;
   padding: 20px;
