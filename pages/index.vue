@@ -23,7 +23,7 @@
         <li>[ ] Alternatively, export data from Letterboxd and process it into fauna from CLI</li>
       </ul>
       <li>[ ] Create a public list of all the films and their ranking</li>
-      <li>[ ] Add an auth mechanism so we can rank and rate films but others can't</li>
+      <li>[ ] Add an <a href="https://www.digitalcore.co.nz/login-dev-guides/01-build-a-login-system-with-nuxt-faunadb-and-netlify.html">auth mechanism</a> so we can rank and rate films but others can't</li>
       <li>[ ] Create film vs film match</li>
       <ul>
         <li>[ ] Front-end display of film vs film (can we fetch movie art?)</li>
