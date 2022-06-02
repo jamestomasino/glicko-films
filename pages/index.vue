@@ -46,20 +46,20 @@ export default {
   name: 'HomePage',
   head () {
     return {
-      title: '',
+      title: 'Tomasino Film Rankings',
       meta: [
-        { hid: 'ogtitle', property: 'og:title', content: '' },
-        { hid: 'twtitle', name: 'twitter:title', content: '' },
-        { hid: 'googlename', itemprop: 'name', content: '' },
-        { hid: 'description', name: 'description', content: '' },
-        { hid: 'ogdescription', property: 'og:description', content: '' },
-        { hid: 'twdescription', name: 'twitter:description', content: '' },
-        { hid: 'googledescription', itemprop: 'description', content: '' },
-        { hid: 'ogurl', property: 'og:url', content: 'https://www.domain.com' + this.$route.path },
-        { hid: 'twsite', name: 'twitter:site', content: 'https://www.domain.com' + this.$route.path }
+        { hid: 'ogtitle', property: 'og:title', content: 'Tomasino Film Rankings' },
+        { hid: 'twtitle', name: 'twitter:title', content: 'Tomasino Film Rankings' },
+        { hid: 'googlename', itemprop: 'name', content: 'Tomasino Film Rankings' },
+        { hid: 'description', name: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'ogdescription', property: 'og:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'twdescription', name: 'twitter:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'googledescription', itemprop: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'ogurl', property: 'og:url', content: 'https://films.tomasino.org' + this.$route.path },
+        { hid: 'twsite', name: 'twitter:site', content: 'https://films.tomasino.org' + this.$route.path }
       ],
       link: [
-        { hid: 'canonical', rel: 'canonical', href: 'https://www.domain.com' + this.$route.path }
+        { hid: 'canonical', rel: 'canonical', href: 'https://films.tomasino.org' + this.$route.path }
       ]
     }
   }

@@ -22,20 +22,6 @@ export default {
   head () {
     return {
       title: 'Tomasino Film Rankings',
-      meta: [
-        { hid: 'ogtitle', property: 'og:title', content: 'Tomasino Film Rankings' },
-        { hid: 'twtitle', name: 'twitter:title', content: 'Tomasino Film Rankings' },
-        { hid: 'googlename', itemprop: 'name', content: 'Tomasino Film Rankings' },
-        { hid: 'description', name: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'ogdescription', property: 'og:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'twdescription', name: 'twitter:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'googledescription', itemprop: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'ogurl', property: 'og:url', content: 'https://films.tomasino.org' + this.$route.path },
-        { hid: 'twsite', name: 'twitter:site', content: 'https://films.tomasino.org' + this.$route.path }
-      ],
-      link: [
-        { hid: 'canonical', rel: 'canonical', href: 'https://films.tomasino.org' + this.$route.path }
-      ],
       bodyAttrs: {
         class: 'page-' + ((this.$route.path.length > 1) ? this.$route.path.slice(1).replace(/\/$/, '').replace(/\//g, '-') : 'home')
       }
