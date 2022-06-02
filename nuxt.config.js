@@ -1,6 +1,8 @@
 
 export default {
   telemetry: false,
+  target: 'static',
+  ssr: false,
   /*
   ** Headers of the page
   */
@@ -33,12 +35,7 @@ export default {
   /*
   ** Plugins to load before mounting the App
   */
-  plugins: [
-    { mode: 'client', src: '~/plugins/focus-trap.js' },
-    { mode: 'client', src: '~/plugins/exit-link.js' },
-    { mode: 'client', src: '~/plugins/scroll-frame.js' },
-    { mode: 'client', src: '~/plugins/vh.js' }
-  ],
+  plugins: [],
   /*
   ** Nuxt.js dev-modules
   */
@@ -52,10 +49,10 @@ export default {
   modules: [
     '@nuxtjs/sitemap',
     '@nuxtjs/robots',
-    '@nuxtjs/redirect-module'
+    '@nuxtjs/axios'
   ],
   sitemap: {
-    hostname: 'https://www.domain.com',
+    hostname: 'https://films.tomasino.org',
     gzip: true,
     trailingSlash: true,
     defaults: {
@@ -73,11 +70,8 @@ export default {
   },
   robots: {
     UserAgent: '*',
-    Sitemap: 'https://www.domain.com/sitemap.xml'
+    Sitemap: 'https://films.tomasino.org/sitemap.xml'
   },
-  redirect: [
-    { from: '^(\\/[^\\?]*[^\\/])(\\?.*)?$', to: '$1/$2', statusCode: 301 }
-  ],
   /*
   ** Build configuration
   */
@@ -88,5 +82,8 @@ export default {
     extend (config, ctx) {
     }
   },
-  components: true
+  components: true,
+  generate: {
+    fallback: true
+  }
 }
