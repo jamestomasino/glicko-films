@@ -1,0 +1,66 @@
+#main,
+#main:active,
+#main:focus {
+  outline: 0px solid transparent;
+}
+
+#skip a {
+  display: block;
+  position: absolute;
+  left: -999px;
+  top: -999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  &:focus {
+    left: auto;
+    top: auto;
+    width: 30%;
+    height: auto;
+    overflow: auto;
+    margin: 10px 35%;
+    color: #000000;
+    background-color: #ffffff;
+    padding: 5px;
+    border-radius: 15px;
+    border: 4px solid #000000;
+    text-align: center;
+    font-size: 1.2em;
+    z-index: 999;
+  }
+}
+
+.killscroll {
+  overflow: hidden;
+}
+
+.accessible {
+	position: absolute;
+	overflow: hidden;
+	width: 1px;
+	height: 1px;
+	opacity: 0;
+	transform: translateX(-1000);
+}
+
+@media screen and (max-width: 767px) {
+	.accessible-mobile {
+		position: absolute;
+		overflow: hidden;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+		transform: translateX(-1000);
+	}
+}
+
+@media screen and (min-width: 768px) {
+	.accessible-desktop {
+		position: absolute;
+		overflow: hidden;
+		width: 1px;
+		height: 1px;
+		opacity: 0;
+		transform: translateX(-1000);
+	}
+}
