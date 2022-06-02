@@ -9,38 +9,6 @@
       aria-label="main"
       role="main"
     />
-    <GlobalISI>
-      <h2>
-        IMPORTANT SAFETY INFORMATION
-      </h2>
-      <p>
-        <strong>Indication for Use</strong>
-      </p>
-      <p>
-        <Brand /> is a brand that treats a medical condition.
-      </p>
-      <p>
-        <strong>Contraindication</strong>
-      </p>
-      <p>
-        <Brand /> is contraindicated in the presence of clinically important elements.
-      </p>
-      <p>
-        <strong>Warnings &amp; Precautions</strong>
-      </p>
-      <ul>
-        <li><Brand /> is intended for single use only. <strong>Do not</strong> reuse, resterilize, reprocess, or use if primary packaging has been opened or damaged. Discard after use.</li>
-      </ul>
-      <p>
-        <strong>Storage &amp; Handling:</strong>
-        Store between -95°C and +90°C and keep away from direct sunlight and high humidity.
-      </p>
-      <p>
-        <em>You are encouraged to report adverse events related to <Brand /> by calling <a href="tel:18882579676">1 (888) 257-9676</a>. If you prefer, you may contact the U.S. Food and Drug Administration (FDA) directly.
-          Visit <strong><a href="http://www.fda.gov/MedWatch">http://www.fda.gov/MedWatch</a></strong> or call <a href="tel:18003321088">1-800-FDA-1088</a>.</em>
-      </p>
-    </GlobalISI>
-    <GlobalModalExit />
   </div>
 </template>
 
@@ -53,20 +21,20 @@ export default {
   name: 'App',
   head () {
     return {
-      title: '',
+      title: 'Tomasino Film Rankings',
       meta: [
-        { hid: 'ogtitle', property: 'og:title', content: '' },
-        { hid: 'twtitle', name: 'twitter:title', content: '' },
-        { hid: 'googlename', itemprop: 'name', content: '' },
-        { hid: 'description', name: 'description', content: '' },
-        { hid: 'ogdescription', property: 'og:description', content: '' },
-        { hid: 'twdescription', name: 'twitter:description', content: '' },
-        { hid: 'googledescription', itemprop: 'description', content: '' },
-        { hid: 'ogurl', property: 'og:url', content: 'https://www.domain.com/' + this.$route.path },
-        { hid: 'twsite', name: 'twitter:site', content: 'https://www.domain.com/' + this.$route.path }
+        { hid: 'ogtitle', property: 'og:title', content: 'Tomasino Film Rankings' },
+        { hid: 'twtitle', name: 'twitter:title', content: 'Tomasino Film Rankings' },
+        { hid: 'googlename', itemprop: 'name', content: 'Tomasino Film Rankings' },
+        { hid: 'description', name: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'ogdescription', property: 'og:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'twdescription', name: 'twitter:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'googledescription', itemprop: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'ogurl', property: 'og:url', content: 'https://films.tomasino.org' + this.$route.path },
+        { hid: 'twsite', name: 'twitter:site', content: 'https://films.tomasino.org' + this.$route.path }
       ],
       link: [
-        { hid: 'canonical', rel: 'canonical', href: 'https://www.domain.com/' + this.$route.path }
+        { hid: 'canonical', rel: 'canonical', href: 'https://films.tomasino.org' + this.$route.path }
       ],
       bodyAttrs: {
         class: 'page-' + ((this.$route.path.length > 1) ? this.$route.path.slice(1).replace(/\/$/, '').replace(/\//g, '-') : 'home')

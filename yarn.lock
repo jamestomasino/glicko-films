@@ -4304,6 +4304,11 @@ git-url-parse@^11.4.4:
   dependencies:
     git-up "^4.0.0"
 
+glicko2@^0.8.7:
+  version "0.8.7"
+  resolved "https://registry.yarnpkg.com/glicko2/-/glicko2-0.8.7.tgz#6e873dfa1f5160780db220e00ef7ee6b48e9bcc7"
+  integrity sha512-Jq1ki82IcdHF61BmjRX4WJne3ARSvcaKNVvEblV1HcFAck44rcfPhQIkejEgPwokrWRBQYVemZWDiWc1NUrxAw==
+
 glob-parent@^3.1.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/glob-parent/-/glob-parent-3.1.0.tgz#9e6af6299d8d3bd2bd40430832bd113df906c5ae"
