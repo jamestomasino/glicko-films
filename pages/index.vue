@@ -22,14 +22,14 @@
       <li>[x] Connect to fauna database</li>
       <ul>
         <li>[ ] <a href="https://davidparks.dev/blog/building-a-like-counter-with-faunadb-and-nuxt/">Learn to use fauna</a></li>
-        <li>[ ] Configure fauna database</li>
+        <li>[x] Configure fauna database</li>
       </ul>
       <li>[ ] Connect to letterboxd API - (In private beta, may not be feasible)</li>
       <ul>
         <li>[ ] Fetch watchlist of user</li>
         <li>[ ] Parse fetched data to fill and append film list into fauna</li>
         <li>[ ] Estimate provisional Glicko-2 ranking based on film stars on letterboxd</li>
-        <li>[ ] Alternatively, export data from Letterboxd and process it into fauna from CLI</li>
+        <li>[x] Alternatively, export data from Letterboxd and process it into fauna from CLI</li>
       </ul>
       <li>[ ] Create a public list of all the films and their ranking</li>
       <li>[ ] Add an <a href="https://www.digitalcore.co.nz/login-dev-guides/01-build-a-login-system-with-nuxt-faunadb-and-netlify.html">auth mechanism</a> so we can rank and rate films but others can't</li>
