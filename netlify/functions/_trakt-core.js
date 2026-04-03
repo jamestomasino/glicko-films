@@ -24,20 +24,29 @@ function getTraktConfig () {
   return { clientId, clientSecret, redirectUri }
 }
 
+function traktHeaders ({ includeContentType = true } = {}) {
+  const { clientId } = getTraktConfig()
+  const headers = {
+    accept: 'application/json',
+    'trakt-api-version': '2',
+    'trakt-api-key': clientId,
+    'user-agent': process.env.TRAKT_HTTP_USER_AGENT || 'films.tomasino.org (+https://films.tomasino.org)'
+  }
+  if (includeContentType) headers['content-type'] = 'application/json'
+  return headers
+}
+
 async function requestDeviceCode () {
   const { clientId } = getTraktConfig()
   const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/device/code`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'trakt-api-version': '2',
-      'trakt-api-key': clientId
-    },
+    headers: traktHeaders(),
     body: JSON.stringify({ client_id: clientId })
   })
 
   if (!response.ok) {
-    throw new Error(`Device code request failed (HTTP ${response.status})`)
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Device code request failed (HTTP ${response.status})${detail ? `: ${detail.slice(0, 400)}` : ''}`)
   }
 
   return response.json()
@@ -58,11 +67,7 @@ async function pollDeviceToken (code) {
   const { clientId, clientSecret } = getTraktConfig()
   const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/device/token`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'trakt-api-version': '2',
-      'trakt-api-key': clientId
-    },
+    headers: traktHeaders(),
     body: JSON.stringify({
       code,
       client_id: clientId,
@@ -75,7 +80,8 @@ async function pollDeviceToken (code) {
   }
 
   if (!response.ok) {
-    throw new Error(`Device token request failed (HTTP ${response.status})`)
+    const detail = await response.text().catch(() => '')
+    throw new Error(`Device token request failed (HTTP ${response.status})${detail ? `: ${detail.slice(0, 400)}` : ''}`)
   }
 
   const token = await response.json()
@@ -86,11 +92,7 @@ async function exchangeAuthorizationCode (code) {
   const { clientId, clientSecret, redirectUri } = getTraktConfig()
   const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/token`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'trakt-api-version': '2',
-      'trakt-api-key': clientId
-    },
+    headers: traktHeaders(),
     body: JSON.stringify({
       code,
       client_id: clientId,
@@ -102,7 +104,7 @@ async function exchangeAuthorizationCode (code) {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => '')
-    throw new Error(`OAuth code exchange failed (HTTP ${response.status})${detail ? `: ${detail}` : ''}`)
+    throw new Error(`OAuth code exchange failed (HTTP ${response.status})${detail ? `: ${detail.slice(0, 400)}` : ''}`)
   }
 
   return response.json()
