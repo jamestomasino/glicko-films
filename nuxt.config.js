@@ -48,8 +48,7 @@ export default {
   */
   modules: [
     '@nuxtjs/sitemap',
-    '@nuxtjs/robots',
-    '@nuxtjs/axios'
+    '@nuxtjs/robots'
   ],
   sitemap: {
     hostname: 'https://films.tomasino.org',
