@@ -6,7 +6,7 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 
 - Runtime: Nuxt 2 static site + Netlify Functions
 - Database: Netlify Neon Postgres + Drizzle schema/migrations
-- Seed source: Trakt movie export (TV ignored)
+- Seed source: Trakt movie export (TV ignored), with Trakt API sync planned
 - Image strategy: TMDb poster derivatives cached into Netlify Blobs (`thumb` and `cover`)
 - Homepage: ranked film list with infinite scroll (100 at a time), position, thumbnail, title, TMDb link
 
@@ -28,9 +28,52 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 
 ## Backlog
 
-- [ ] Add re-sync utilities for incremental Trakt updates
+- [ ] Add Trakt API auth + incremental re-sync (movies only)
 - [ ] Add optional job queueing for long-running admin tasks
 - [ ] Add alerting integration for production function errors
+
+## Trakt API Integration Plan
+
+Docs:
+
+- https://trakt.docs.apiary.io/#introduction/
+- https://github.com/trakt/trakt-api
+
+Base + headers:
+
+- Base URL: `https://api.trakt.tv`
+- Required headers on API requests:
+  - `trakt-api-version: 2`
+  - `trakt-api-key: <TRAKT_CLIENT_ID>`
+  - `Authorization: Bearer <access_token>` for user endpoints
+
+Auth strategy (recommended for this personal app):
+
+- Use device flow:
+  - `POST /oauth/device/code`
+  - `POST /oauth/device/token`
+- Persist `access_token`, `refresh_token`, `created_at`, `expires_in` for the single user.
+- Refresh tokens using `POST /oauth/token` before expiry.
+
+Incremental sync strategy (movies only):
+
+- Pull from `GET /users/me/history/movies` with `start_at`, `end_at`, `page`, `limit`.
+- Treat history rows as watched events only (real plays), keyed by `trakt_history_id`.
+- Do not import from watchlist, collection, favorites, or ratings as watch activity.
+- Upsert new watch rows into `film_watch_events` using unique `trakt_history_id`.
+- Upsert/insert films by `tmdb_id` where possible, then run existing seed + image cache steps.
+- Ignore all TV endpoints (`shows`, `episodes`) in this project.
+
+Implementation shape:
+
+- New Netlify function(s):
+  - `admin-trakt-auth-start` (device code)
+  - `admin-trakt-auth-poll` (poll token)
+  - `admin-trakt-sync` (incremental history sync)
+- New admin UI section in `/admin`:
+  - Connect Trakt
+  - Run sync now
+  - Show last synced timestamp + counts
 
 ## Seeding Model
 
