@@ -4,6 +4,9 @@ const { neon } = require('@netlify/neon')
 const DEFAULT_POOL_SIZE = 12
 const DEFAULT_COOLDOWN_DAYS = 30
 const DEFAULT_SWISS_ROUNDS = 4
+const DEFAULT_PAIRING = 'swiss'
+const DEFAULT_BAND = 'normal'
+const DEFAULT_RANGE = 'random'
 
 module.exports = {
   getScoreState,
@@ -21,7 +24,7 @@ async function getScoreState () {
       pendingCount: 0,
       matchup: null,
       needsStart: true,
-      modes: availableModes()
+      startOptions: availableStartOptions()
     }
   }
 
@@ -38,7 +41,7 @@ async function getScoreState () {
       matchup: null,
       needsStart: true,
       justCompleted: true,
-      modes: availableModes()
+      startOptions: availableStartOptions()
     }
   }
 
@@ -51,15 +54,15 @@ async function getScoreState () {
     pendingCount: Number(nextMatch.pending_count || nextMatch.pendingCount || 0),
     matchup: mapMatch(nextMatch),
     needsStart: false,
-    modes: availableModes()
+    startOptions: availableStartOptions()
   }
 }
 
-async function startTournament ({ mode } = {}) {
+async function startTournament ({ mode, pairing, band, range } = {}) {
   const sql = neon()
   const active = await getActiveTournament(sql)
   if (!active) {
-    await createTournament(sql, { mode })
+    await createTournament(sql, { mode, pairing, band, range })
   }
   return getScoreState()
 }
@@ -108,12 +111,14 @@ async function getActiveTournament (sql) {
   return rows[0] || null
 }
 
-async function createTournament (sql, { mode } = {}) {
-  const selectedMode = normalizeMode(mode)
+async function createTournament (sql, { mode, pairing, band, range } = {}) {
+  const selectedBand = normalizeBand(band || mode)
+  const selectedPairing = normalizePairing(pairing || mode)
+  const selectedRange = normalizeRange(range)
   const cooldownDays = parseIntEnv('SCORE_PAIR_COOLDOWN_DAYS', DEFAULT_COOLDOWN_DAYS, 1, 365)
   const basePoolSize = parseIntEnv('SCORE_TOURNAMENT_POOL_SIZE', DEFAULT_POOL_SIZE, 4, 24)
   const widePoolSize = parseIntEnv('SCORE_WIDE_POOL_SIZE', Math.min(24, basePoolSize + 6), 4, 24)
-  const poolSize = selectedMode === 'wide' ? widePoolSize : basePoolSize
+  const poolSize = selectedBand === 'wide' ? widePoolSize : basePoolSize
 
   const films = await sql.query(
     `select
@@ -131,18 +136,16 @@ async function createTournament (sql, { mode } = {}) {
   }
 
   const recentPairs = await loadRecentPairSet(sql, cooldownDays)
-  const selectedFilms = selectedMode === 'wide'
-    ? selectWideSpreadPool(films, poolSize, recentPairs)
-    : selectSimilarityPool(films, poolSize, recentPairs)
+  const rangeCandidates = selectRangeCandidates(films, selectedRange, poolSize)
+  const sourceFilms = rangeCandidates.length >= 2 ? rangeCandidates : films
+  const selectedFilms = selectedBand === 'wide'
+    ? selectWideSpreadPool(sourceFilms, poolSize, recentPairs)
+    : selectSimilarityPool(sourceFilms, poolSize, recentPairs)
   if (selectedFilms.length < 2) {
     throw new Error('Unable to build tournament pool.')
   }
 
-  const strategy = selectedMode === 'wide'
-    ? 'wide_spread_v1'
-    : selectedMode === 'swiss'
-      ? 'swiss_v1'
-      : 'similarity_v1'
+  const strategy = encodeStrategy({ pairing: selectedPairing, band: selectedBand, range: selectedRange })
 
   const [insertedTournament] = await sql.query(
     `insert into score_tournaments (status, strategy, pool_size, cooldown_days)
@@ -160,7 +163,7 @@ async function createTournament (sql, { mode } = {}) {
   }
 
   const swissRounds = parseIntEnv('SCORE_SWISS_ROUNDS', DEFAULT_SWISS_ROUNDS, 2, 12)
-  const pairRows = selectedMode === 'swiss'
+  const pairRows = selectedPairing === 'swiss'
     ? buildSwissPairRows(selectedFilms, recentPairs, swissRounds, insertedTournament.id)
     : buildRoundRobinPairRows(selectedFilms, insertedTournament.id)
 
@@ -352,6 +355,16 @@ function selectSimilarityPool (films, poolSize, recentPairs) {
   return chosen
 }
 
+function selectRangeCandidates (films, range, poolSize) {
+  if (range === 'random') return films
+  const sorted = [...films].sort((a, b) => Number(a.rating) - Number(b.rating))
+  const minCount = Math.max(poolSize + 2, Math.ceil(sorted.length * 0.4))
+  if (range === 'high') return sorted.slice(-minCount)
+  if (range === 'low') return sorted.slice(0, minCount)
+  const start = Math.max(0, Math.floor((sorted.length - minCount) / 2))
+  return sorted.slice(start, start + minCount)
+}
+
 function selectWideSpreadPool (films, poolSize, recentPairs) {
   const sorted = [...films]
     .map((film) => ({ ...film, jitter: Math.random() }))
@@ -496,15 +509,57 @@ function parseIntEnv (name, fallback, min, max) {
   return Math.min(max, Math.max(min, parsed))
 }
 
-function normalizeMode (mode) {
-  if (mode === 'wide' || mode === 'swiss') return mode
-  return 'normal'
+function normalizePairing (value) {
+  if (value === 'swiss') return 'swiss'
+  if (value === 'round_robin') return 'round_robin'
+  if (value === 'normal' || value === 'wide') return 'round_robin'
+  return DEFAULT_PAIRING
 }
 
-function availableModes () {
-  return [
-    { id: 'normal', label: 'Normal', description: 'Current pool rules with full round-robin pairs.' },
-    { id: 'wide', label: 'Wide Spread', description: 'Broader Elo spread in the tournament pool.' },
-    { id: 'swiss', label: 'Swiss-Style', description: 'Seeded rounds with fewer total pairings.' }
-  ]
+function normalizeBand (value) {
+  if (value === 'wide') return 'wide'
+  if (value === 'normal') return 'normal'
+  return DEFAULT_BAND
+}
+
+function normalizeRange (value) {
+  if (value === 'high' || value === 'middle' || value === 'low') return value
+  return DEFAULT_RANGE
+}
+
+function encodeStrategy ({ pairing, band, range }) {
+  const pairingCode = pairing === 'swiss' ? 'sw' : 'rr'
+  const bandCode = band === 'wide' ? 'w' : 'n'
+  const rangeCode = range === 'high'
+    ? 'h'
+    : range === 'middle'
+      ? 'm'
+      : range === 'low'
+        ? 'l'
+        : 'r'
+  return `v2_${pairingCode}${bandCode}${rangeCode}`
+}
+
+function availableStartOptions () {
+  return {
+    defaults: {
+      pairing: DEFAULT_PAIRING,
+      band: DEFAULT_BAND,
+      range: DEFAULT_RANGE
+    },
+    pairing: [
+      { id: 'round_robin', label: 'Full Pairing', description: 'Every film in the pool faces every other film.' },
+      { id: 'swiss', label: 'Swiss Rules', description: 'Fewer seeded rounds, faster tournament completion.' }
+    ],
+    band: [
+      { id: 'normal', label: 'Normal Band', description: 'Standard rating spread.' },
+      { id: 'wide', label: 'Wide Band', description: 'Larger rating spread in each tournament pool.' }
+    ],
+    range: [
+      { id: 'random', label: 'Random Range', description: 'No Elo targeting; sample across the catalog.' },
+      { id: 'high', label: 'High Range', description: 'Focus near higher Elo films.' },
+      { id: 'middle', label: 'Middle Range', description: 'Focus around mid Elo films.' },
+      { id: 'low', label: 'Low Range', description: 'Focus near lower Elo films.' }
+    ]
+  }
 }

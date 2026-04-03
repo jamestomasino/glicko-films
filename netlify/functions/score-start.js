@@ -24,9 +24,11 @@ exports.handler = async (event) => {
     }
 
     const body = JSON.parse(event.body || '{}')
-    const mode = typeof body.mode === 'string' ? body.mode : 'normal'
+    const pairing = typeof body.pairing === 'string' ? body.pairing : 'swiss'
+    const band = typeof body.band === 'string' ? body.band : 'normal'
+    const range = typeof body.range === 'string' ? body.range : 'random'
 
-    const state = await startTournament({ mode })
+    const state = await startTournament({ pairing, band, range })
     return jsonResponse(200, state)
   } catch (error) {
     console.error('score-start failed', { message: error.message })

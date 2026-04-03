@@ -107,26 +107,65 @@
         <h2>Ready for a new batch?</h2>
         <p>Start a tournament when you want to continue scoring.</p>
         <div class="mode-grid">
-          <label
-            v-for="mode in state?.modes || []"
-            :key="mode.id"
-            class="mode-option"
-          >
-            <input
-              v-model="startMode"
-              type="radio"
-              name="start-mode"
-              :value="mode.id"
+          <div class="mode-group">
+            <h3>Pairing</h3>
+            <label
+              v-for="option in state?.startOptions?.pairing || []"
+              :key="option.id"
+              class="mode-option"
             >
-            <span class="mode-title">{{ mode.label }}</span>
-            <span class="mode-description">{{ mode.description }}</span>
-          </label>
+              <input
+                v-model="startPairing"
+                type="radio"
+                name="start-pairing"
+                :value="option.id"
+              >
+              <span class="mode-title">{{ option.label }}</span>
+              <span class="mode-description">{{ option.description }}</span>
+            </label>
+          </div>
+
+          <div class="mode-group">
+            <h3>Band Size</h3>
+            <label
+              v-for="option in state?.startOptions?.band || []"
+              :key="option.id"
+              class="mode-option"
+            >
+              <input
+                v-model="startBand"
+                type="radio"
+                name="start-band"
+                :value="option.id"
+              >
+              <span class="mode-title">{{ option.label }}</span>
+              <span class="mode-description">{{ option.description }}</span>
+            </label>
+          </div>
+
+          <div class="mode-group">
+            <h3>Elo Range</h3>
+            <label
+              v-for="option in state?.startOptions?.range || []"
+              :key="option.id"
+              class="mode-option"
+            >
+              <input
+                v-model="startRange"
+                type="radio"
+                name="start-range"
+                :value="option.id"
+              >
+              <span class="mode-title">{{ option.label }}</span>
+              <span class="mode-description">{{ option.description }}</span>
+            </label>
+          </div>
         </div>
         <button
           :disabled="loading"
           @click="startTournament"
         >
-          Start {{ selectedModeLabel }} Tournament
+          Start {{ selectedStartSummary }} Tournament
         </button>
       </section>
 
@@ -148,7 +187,9 @@ export default {
       authenticated: false,
       password: '',
       state: null,
-      startMode: 'normal',
+      startPairing: 'swiss',
+      startBand: 'normal',
+      startRange: 'random',
       error: '',
       loading: false
     }
@@ -205,8 +246,7 @@ export default {
           throw new Error('Failed to load scoring state.')
         }
         this.state = await response.json()
-        if (this.state?.modes?.some((mode) => mode.id === this.startMode)) return
-        this.startMode = this.state?.modes?.[0]?.id || 'normal'
+        this.syncStartDefaults()
       } catch (error) {
         this.error = error.message || 'Failed to load scoring state.'
       } finally {
@@ -247,7 +287,11 @@ export default {
           method: 'POST',
           credentials: 'include',
           headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
-          body: JSON.stringify({ mode: this.startMode })
+          body: JSON.stringify({
+            pairing: this.startPairing,
+            band: this.startBand,
+            range: this.startRange
+          })
         })
         if (!response.ok) {
           throw new Error('Failed to start tournament.')
@@ -260,9 +304,35 @@ export default {
       }
     },
     strategyLabel (strategy) {
-      if (strategy === 'wide_spread_v1') return 'Wide Spread'
-      if (strategy === 'swiss_v1') return 'Swiss-Style'
-      return 'Normal'
+      if (!strategy) return 'Normal'
+      const match = /^v2_(sw|rr)(n|w)(r|h|m|l)$/.exec(strategy)
+      if (!match) return 'Normal'
+      const pairing = match[1] === 'sw' ? 'Swiss Rules' : 'Full Pairing'
+      const band = match[2] === 'w' ? 'Wide Band' : 'Normal Band'
+      const range = match[3] === 'h'
+        ? 'High Range'
+        : match[3] === 'm'
+          ? 'Middle Range'
+          : match[3] === 'l'
+            ? 'Low Range'
+            : 'Random Range'
+      return `${pairing} · ${band} · ${range}`
+    },
+    syncStartDefaults () {
+      const defaults = this.state?.startOptions?.defaults || {}
+      this.startPairing = this.resolveStartValue('pairing', this.startPairing, defaults.pairing, 'swiss')
+      this.startBand = this.resolveStartValue('band', this.startBand, defaults.band, 'normal')
+      this.startRange = this.resolveStartValue('range', this.startRange, defaults.range, 'random')
+    },
+    resolveStartValue (key, current, preferred, fallback) {
+      const options = this.state?.startOptions?.[key] || []
+      if (options.some((option) => option.id === current)) return current
+      if (options.some((option) => option.id === preferred)) return preferred
+      return options[0]?.id || fallback
+    },
+    findOptionLabel (key, value) {
+      const match = this.state?.startOptions?.[key]?.find((option) => option.id === value)
+      return match?.label || value
     },
     async logout () {
       await fetch('/api/score/logout', {
@@ -273,14 +343,18 @@ export default {
       this.authenticated = false
       this.state = null
       this.password = ''
-      this.startMode = 'normal'
+      this.startPairing = 'swiss'
+      this.startBand = 'normal'
+      this.startRange = 'random'
       window.dispatchEvent(new Event('score-auth-changed'))
     }
   },
   computed: {
-    selectedModeLabel () {
-      const match = this.state?.modes?.find((mode) => mode.id === this.startMode)
-      return match?.label || 'Normal'
+    selectedStartSummary () {
+      const pairing = this.findOptionLabel('pairing', this.startPairing)
+      const band = this.findOptionLabel('band', this.startBand)
+      const range = this.findOptionLabel('range', this.startRange)
+      return `${pairing} · ${band} · ${range}`
     }
   }
 }
@@ -408,8 +482,21 @@ button {
 
 .mode-grid {
   display: grid;
-  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
   margin-bottom: 0.9rem;
+}
+
+.mode-group {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+}
+
+.mode-group h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #c7d4ee;
 }
 
 .mode-option {
@@ -465,6 +552,11 @@ button {
   .battle-header p {
     font-size: 0.85rem;
     margin: 0.35rem 0 0;
+  }
+
+  .mode-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
   }
 
   .battle-grid {
