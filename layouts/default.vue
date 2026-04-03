@@ -3,7 +3,7 @@
     <div id="skip">
       <a class="skip-main" href="#main">Skip to main content</a>
     </div>
-    <nav class="site-nav" aria-label="Primary">
+    <nav v-if="showNav" class="site-nav" aria-label="Primary">
       <nuxt-link to="/" exact-active-class="is-active">Rankings</nuxt-link>
       <nuxt-link to="/score" exact-active-class="is-active">Scoring</nuxt-link>
       <nuxt-link to="/admin" exact-active-class="is-active">Admin</nuxt-link>
@@ -24,6 +24,11 @@ let bodyTag = null
 
 export default {
   name: 'App',
+  data () {
+    return {
+      hasScoreSession: false
+    }
+  },
   head () {
     return {
       title: 'Tomasino Film Rankings',
@@ -33,20 +38,15 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('modals', ['isModalOpen'])
-  },
-  watch: {
-    isModalOpen (val) {
-      if (val) {
-        bodyTag.classList.add('killscroll')
-      } else {
-        bodyTag.classList.remove('killscroll')
-      }
+    ...mapGetters('modals', ['isModalOpen']),
+    showNav () {
+      return this.hasScoreSession && this.$route.path !== '/'
     }
   },
   mounted () {
     bodyTag = document.getElementsByTagName('body')[0]
     bodyTag.classList.remove('killscroll')
+    this.refreshScoreSession()
 
     if (this.getParameterByName('screenshot')) {
       bodyTag.classList.add('screenshot')
@@ -59,6 +59,19 @@ export default {
     }
   },
   methods: {
+    async refreshScoreSession () {
+      try {
+        const response = await fetch('/api/score/session', { credentials: 'include' })
+        if (!response.ok) {
+          this.hasScoreSession = false
+          return
+        }
+        const payload = await response.json()
+        this.hasScoreSession = Boolean(payload.authenticated)
+      } catch {
+        this.hasScoreSession = false
+      }
+    },
     scrollToHash () {
       const hash = this.$nuxt.$route.hash
       this.$nextTick(() => {
@@ -81,6 +94,18 @@ export default {
         }
         return decodeURIComponent(results[2].replace(/\+/g, ' '))
       }
+    }
+  },
+  watch: {
+    isModalOpen (val) {
+      if (val) {
+        bodyTag.classList.add('killscroll')
+      } else {
+        bodyTag.classList.remove('killscroll')
+      }
+    },
+    '$route.path' () {
+      this.refreshScoreSession()
     }
   }
 }
