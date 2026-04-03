@@ -121,6 +121,20 @@ export default function AdminPage() {
     })
   }
 
+  async function beginTraktOAuthRedirect() {
+    await runAction(async () => {
+      const response = await fetch('/api/admin/trakt-auth-begin', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'x-film-write-intent': '1' }
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Failed to begin redirect auth.')
+      if (!payload.authorizeUrl) throw new Error('Missing authorize URL.')
+      window.location.href = payload.authorizeUrl
+    })
+  }
+
   async function pollTraktDeviceAuth() {
     await runAction(async () => {
       const response = await fetch('/api/admin/trakt-auth-poll', {
@@ -271,6 +285,7 @@ export default function AdminPage() {
             : <p className="c-page-subtitle">Status unknown.</p>}
           {traktStatus?.redirectUri ? <p>Redirect URI: <code>{traktStatus.redirectUri}</code></p> : null}
           <form className="inline-form" onSubmit={startTraktDeviceAuth}>
+            <button className="c-button" disabled={loading} type="button" onClick={beginTraktOAuthRedirect}>Connect Redirect OAuth</button>
             <button className="c-button" disabled={loading} type="submit">Start Device Auth</button>
             <button className="c-button-quiet" disabled={loading || !deviceAuth.deviceCode} type="button" onClick={pollTraktDeviceAuth}>Poll Token</button>
           </form>

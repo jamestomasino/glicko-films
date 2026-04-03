@@ -3,8 +3,10 @@ const TRAKT_API_BASE_URL = 'https://api.trakt.tv'
 module.exports = {
   TRAKT_API_BASE_URL,
   getTraktConfig,
+  buildAuthorizeUrl,
   requestDeviceCode,
   pollDeviceToken,
+  exchangeAuthorizationCode,
   fetchAuthState,
   saveAuthState,
   tokenExpiryAtIso
@@ -41,6 +43,17 @@ async function requestDeviceCode () {
   return response.json()
 }
 
+function buildAuthorizeUrl ({ state } = {}) {
+  const { clientId, redirectUri } = getTraktConfig()
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri
+  })
+  if (state) params.set('state', state)
+  return `https://trakt.tv/oauth/authorize?${params.toString()}`
+}
+
 async function pollDeviceToken (code) {
   const { clientId, clientSecret } = getTraktConfig()
   const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/device/token`, {
@@ -67,6 +80,32 @@ async function pollDeviceToken (code) {
 
   const token = await response.json()
   return { pending: false, token }
+}
+
+async function exchangeAuthorizationCode (code) {
+  const { clientId, clientSecret, redirectUri } = getTraktConfig()
+  const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/token`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'trakt-api-version': '2',
+      'trakt-api-key': clientId
+    },
+    body: JSON.stringify({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code'
+    })
+  })
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(`OAuth code exchange failed (HTTP ${response.status})${detail ? `: ${detail}` : ''}`)
+  }
+
+  return response.json()
 }
 
 async function fetchAuthState (sql) {
