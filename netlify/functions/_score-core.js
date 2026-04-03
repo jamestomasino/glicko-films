@@ -139,6 +139,37 @@ async function createTournament (sql) {
 }
 
 async function getNextPendingMatch (sql, tournamentId) {
+  const [lastRated] = await sql.query(
+    `select film_low_id, film_high_id
+     from score_matches
+     where tournament_id = $1 and score_low is not null
+     order by rated_at desc, id desc
+     limit 1`,
+    [tournamentId]
+  )
+
+  if (lastRated) {
+    const preferred = await queryPendingMatch(sql, tournamentId, [
+      Number(lastRated.film_low_id),
+      Number(lastRated.film_high_id)
+    ])
+    if (preferred) return preferred
+  }
+
+  return queryPendingMatch(sql, tournamentId)
+}
+
+async function queryPendingMatch (sql, tournamentId, avoidFilmIds = null) {
+  const params = [tournamentId]
+  let avoidSql = ''
+
+  if (Array.isArray(avoidFilmIds) && avoidFilmIds.length === 2) {
+    params.push(avoidFilmIds[0], avoidFilmIds[1])
+    avoidSql = `
+      and m.film_low_id not in ($2, $3)
+      and m.film_high_id not in ($2, $3)`
+  }
+
   const rows = await sql.query(
     `select
       m.id as match_id,
@@ -160,9 +191,10 @@ async function getNextPendingMatch (sql, tournamentId) {
      join films low on low.id = m.film_low_id
      join films high on high.id = m.film_high_id
      where m.tournament_id = $1 and m.score_low is null
-     order by m.id asc
+     ${avoidSql}
+     order by random()
      limit 1`,
-    [tournamentId]
+    params
   )
 
   return rows[0] || null
