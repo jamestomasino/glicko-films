@@ -21,3 +21,9 @@
   to = "/.netlify/functions/score-:splat"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/api/admin/*"
+  to = "/.netlify/functions/admin-:splat"
+  status = 200
+  force = true

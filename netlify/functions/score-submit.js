@@ -1,5 +1,6 @@
 const { isAuthorized } = require('./_score-auth')
 const { submitScore } = require('./_score-core')
+const { isRateLimited, getClientIp } = require('./_rate-limit')
 
 exports.handler = async (event) => {
   try {
@@ -8,6 +9,14 @@ exports.handler = async (event) => {
     }
     if (!isAuthorized(event)) {
       return jsonResponse(401, { error: 'Unauthorized.' })
+    }
+    const rate = isRateLimited({
+      key: `score-submit:${getClientIp(event)}`,
+      limit: 180,
+      windowMs: 60_000
+    })
+    if (rate.limited) {
+      return jsonResponse(429, { error: 'Too many submissions. Slow down a bit.' })
     }
 
     const body = JSON.parse(event.body || '{}')
@@ -22,6 +31,7 @@ exports.handler = async (event) => {
     const nextState = await submitScore({ matchId, tournamentId, outcome })
     return jsonResponse(200, nextState)
   } catch (error) {
+    console.error('score-submit failed', { message: error.message })
     return jsonResponse(500, { error: 'Failed to submit score.', detail: error.message })
   }
 }

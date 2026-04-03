@@ -29,7 +29,8 @@
     "db:migrate": "npx netlify dev:exec drizzle-kit migrate",
     "db:studio": "npx netlify dev:exec drizzle-kit studio",
     "seed:elo": "npx netlify dev:exec -- node scripts/seed-tmdb-elo.mjs",
-    "cache:images": "npx netlify dev:exec -- node scripts/cache-film-images.mjs"
+    "cache:images": "npx netlify dev:exec -- node scripts/cache-film-images.mjs",
+    "smoke:api": "node scripts/smoke-api.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^10.7.4",

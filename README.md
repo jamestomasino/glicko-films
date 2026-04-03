@@ -20,16 +20,17 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 - [x] TMDb-based Elo/Glicko seed model applied to all films
 - [x] Poster thumbnail/cover caching in Netlify Blobs
 - [x] Public rankings homepage with infinite scroll
+- [x] Password-protected scoring workflow + tournament match entry
+- [x] Admin page for manual TMDb intake and film maintenance
+- [x] Admin API endpoints for health, TMDb search, intake add, reseed, recache
+- [x] Basic API guardrails: auth checks, rate limiting on private routes, and error logging
+- [x] Lightweight API smoke test script
 
 ## Backlog
 
-- [ ] Build authenticated scoring workflow (private match-entry UI)
-- [ ] Implement film-vs-film match submission (1-0, 0-1, 0.5-0.5)
-- [ ] Persist match results and run Glicko updates after tournament rounds
-- [ ] Add tournament generation (round-robin first; swiss optional later)
-- [ ] Add manual film intake flow (TMDb search + add film)
 - [ ] Add re-sync utilities for incremental Trakt updates
-- [ ] Add admin pages for cache/seed/import jobs
+- [ ] Add optional job queueing for long-running admin tasks
+- [ ] Add alerting integration for production function errors
 
 ## Seeding Model
 
@@ -49,6 +50,7 @@ Initial rating is derived from TMDb vote average and vote count:
 - `npm run db:studio`
 - `npm run seed:elo`
 - `npm run cache:images`
+- `npm run smoke:api` (requires local or deployed base URL reachable via `SMOKE_BASE_URL`)
 
 For intake of a single new film, cache images immediately with one of:
 

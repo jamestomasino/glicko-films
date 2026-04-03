@@ -3,6 +3,11 @@
     <div id="skip">
       <a class="skip-main" href="#main">Skip to main content</a>
     </div>
+    <nav class="site-nav" aria-label="Primary">
+      <nuxt-link to="/" exact-active-class="is-active">Rankings</nuxt-link>
+      <nuxt-link to="/score" exact-active-class="is-active">Scoring</nuxt-link>
+      <nuxt-link to="/admin" exact-active-class="is-active">Admin</nuxt-link>
+    </nav>
     <nuxt
       id="main"
       ref="main"
@@ -80,3 +85,34 @@ export default {
   }
 }
 </script>
+
+<style lang="scss">
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(148, 166, 193, 0.25);
+  background: rgba(7, 12, 23, 0.88);
+  backdrop-filter: blur(6px);
+
+  a {
+    color: #c8d2e7;
+    text-decoration: none;
+    font-size: 0.92rem;
+    line-height: 1;
+    border: 1px solid rgba(94, 112, 146, 0.6);
+    border-radius: 9999px;
+    padding: 0.42rem 0.72rem;
+  }
+
+  a.is-active {
+    color: #f8fbff;
+    background: #2149b3;
+    border-color: #6f90ec;
+  }
+}
+</style>
