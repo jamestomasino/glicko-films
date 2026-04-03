@@ -87,3 +87,16 @@ export const scoreMatches = pgTable('score_matches', {
   ratedAt: timestamp('rated_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
+
+export const traktAuthState = pgTable('trakt_auth_state', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  key: varchar({ length: 32 }).notNull().default('primary').unique(),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  tokenType: varchar('token_type', { length: 32 }),
+  scope: text(),
+  createdAtEpoch: integer('created_at_epoch'),
+  expiresIn: integer('expires_in'),
+  connectedAt: timestamp('connected_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})

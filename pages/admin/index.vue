@@ -70,6 +70,35 @@
       </section>
 
       <section class="card">
+        <div class="card-top">
+          <h2>Trakt Connection</h2>
+          <button :disabled="loading" @click="loadTraktStatus">Refresh</button>
+        </div>
+        <p v-if="traktStatus">
+          Status:
+          <strong>{{ traktStatus.connected ? 'Connected' : 'Not connected' }}</strong>
+          <span v-if="traktStatus.expiresAt"> · expires {{ traktStatus.expiresAt }}</span>
+        </p>
+        <p v-if="traktStatus?.redirectUri">
+          Redirect URI: <code>{{ traktStatus.redirectUri }}</code>
+        </p>
+        <form class="id-form" @submit.prevent="startTraktDeviceAuth">
+          <button :disabled="loading" type="submit">Start Device Auth</button>
+          <button
+            :disabled="loading || !deviceAuth.deviceCode"
+            type="button"
+            @click="pollTraktDeviceAuth"
+          >
+            Poll Token
+          </button>
+        </form>
+        <p v-if="deviceAuth.userCode">
+          Enter code <code>{{ deviceAuth.userCode }}</code> at
+          <a :href="deviceAuth.verificationUrlComplete" target="_blank" rel="noopener noreferrer">{{ deviceAuth.verificationUrlComplete }}</a>
+        </p>
+      </section>
+
+      <section class="card">
         <h2>Manual Intake</h2>
         <form class="search-form" @submit.prevent="searchTmdb">
           <input
@@ -146,6 +175,12 @@ export default {
       error: '',
       success: '',
       health: null,
+      traktStatus: null,
+      deviceAuth: {
+        deviceCode: '',
+        userCode: '',
+        verificationUrlComplete: ''
+      },
       searchQuery: '',
       searchResults: [],
       tmdbIdInput: null,
@@ -157,6 +192,7 @@ export default {
     await this.checkSession()
     if (this.authenticated) {
       await this.loadHealth()
+      await this.loadTraktStatus()
     }
   },
   methods: {
@@ -183,6 +219,7 @@ export default {
         this.authenticated = true
         window.dispatchEvent(new Event('score-auth-changed'))
         await this.loadHealth()
+        await this.loadTraktStatus()
       } catch (error) {
         this.error = error.message || 'Login failed.'
       } finally {
@@ -196,6 +233,8 @@ export default {
       })
       this.authenticated = false
       this.health = null
+      this.traktStatus = null
+      this.deviceAuth = { deviceCode: '', userCode: '', verificationUrlComplete: '' }
       this.searchResults = []
       window.dispatchEvent(new Event('score-auth-changed'))
     },
@@ -205,6 +244,48 @@ export default {
         if (!response.ok) throw new Error('Failed to load admin health.')
         this.health = await response.json()
         this.success = `Health refreshed at ${new Date().toLocaleTimeString()}`
+      })
+    },
+    async loadTraktStatus () {
+      await this.runAction(async () => {
+        const response = await fetch('/api/admin/trakt-status', { credentials: 'include' })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Failed to load Trakt status.')
+        this.traktStatus = payload
+      })
+    },
+    async startTraktDeviceAuth () {
+      await this.runAction(async () => {
+        const response = await fetch('/api/admin/trakt-auth-start', {
+          method: 'POST',
+          credentials: 'include'
+        })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Failed to start Trakt auth.')
+        this.deviceAuth = {
+          deviceCode: payload.deviceCode,
+          userCode: payload.userCode,
+          verificationUrlComplete: payload.verificationUrlComplete
+        }
+        this.success = `Trakt code generated. Expires in ${payload.expiresIn}s.`
+      })
+    },
+    async pollTraktDeviceAuth () {
+      await this.runAction(async () => {
+        const response = await fetch('/api/admin/trakt-auth-poll', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ deviceCode: this.deviceAuth.deviceCode })
+        })
+        const payload = await response.json()
+        if (!response.ok) throw new Error(payload.error || 'Failed to poll Trakt token.')
+        if (payload.pending) {
+          this.success = 'Still waiting for authorization. Complete Trakt verification and poll again.'
+          return
+        }
+        this.success = 'Trakt connected successfully.'
+        await this.loadTraktStatus()
       })
     },
     async searchTmdb () {
