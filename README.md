@@ -4,7 +4,7 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 
 ## Current State
 
-- Runtime: Nuxt 2 static site + Netlify Functions
+- Runtime: React (Vite) SPA + Netlify Functions
 - Database: Netlify Neon Postgres + Drizzle schema/migrations
 - Seed source: Trakt movie export (TV ignored), with Trakt API sync planned
 - Image strategy: TMDb poster derivatives cached into Netlify Blobs (`thumb` and `cover`)
@@ -22,9 +22,11 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 - [x] Public rankings homepage with infinite scroll
 - [x] Password-protected scoring workflow + tournament match entry
 - [x] Admin page for manual TMDb intake and film maintenance
+- [x] Scoring tournament setup dimensions: pairing + band size + Elo range
 - [x] Admin API endpoints for health, TMDb search, intake add, reseed, recache
 - [x] Basic API guardrails: auth checks, rate limiting on private routes, and error logging
 - [x] Lightweight API smoke test script
+- [x] Front-end rebuilt onto Catalyst-inspired React design system
 
 ## Backlog
 
