@@ -1,11 +1,18 @@
 const fs = require('node:fs')
 const path = require('node:path')
-const { getStore } = require('@netlify/blobs')
+const { connectLambda, getStore } = require('@netlify/blobs')
 
 const STORE_NAME = 'film-images'
 
 exports.handler = async (event) => {
   try {
+    // In Lambda compatibility mode, initialize Blobs context from the event.
+    try {
+      connectLambda(event)
+    } catch {
+      // No-op: explicit token/site fallback may still be available.
+    }
+
     const key = normalizeKey(event.queryStringParameters?.key)
     if (!key) {
       return {
@@ -57,7 +64,7 @@ function contentTypeFromKey (key) {
 
 function resolveStore () {
   const token = process.env.NETLIFY_BLOBS_TOKEN
-  const siteID = process.env.NETLIFY_SITE_ID || readSiteIDFromState()
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID || readSiteIDFromState()
 
   if (token && siteID) {
     return getStore({
