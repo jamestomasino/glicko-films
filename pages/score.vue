@@ -258,7 +258,8 @@ button {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 1rem;
-  align-items: stretch;
+  align-items: start;
+  justify-items: center;
 }
 
 .film-card {
@@ -269,10 +270,14 @@ button {
   display: grid;
   grid-template-rows: auto auto auto;
   gap: 0.6rem;
+  width: 100%;
+  max-width: 18rem;
 }
 
 .film-card img {
   width: 100%;
+  max-width: 11rem;
+  justify-self: center;
   border-radius: 0.25rem;
 }
 
@@ -304,6 +309,14 @@ button {
 @media (max-width: 900px) {
   .battle-grid {
     grid-template-columns: 1fr;
+  }
+
+  .film-card {
+    max-width: 14rem;
+  }
+
+  .film-card img {
+    max-width: 8.5rem;
   }
 
   .draw-column {
