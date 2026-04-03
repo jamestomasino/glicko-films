@@ -43,20 +43,21 @@
         class="battle-grid"
       >
         <article class="film-card">
-          <img
-            v-if="state.matchup.leftFilm.coverUrl"
-            :src="state.matchup.leftFilm.coverUrl"
-            :alt="`${state.matchup.leftFilm.title} poster`"
+          <button
+            class="poster-pick"
+            :disabled="loading"
+            :aria-label="`Choose ${state.matchup.leftFilm.title}`"
+            @click="submit('left')"
           >
+            <img
+              v-if="state.matchup.leftFilm.coverUrl"
+              :src="state.matchup.leftFilm.coverUrl"
+              :alt="`${state.matchup.leftFilm.title} poster`"
+            >
+          </button>
           <div class="film-title">
             {{ state.matchup.leftFilm.title }} <span v-if="state.matchup.leftFilm.year">({{ state.matchup.leftFilm.year }})</span>
           </div>
-          <button
-            :disabled="loading"
-            @click="submit('left')"
-          >
-            Left Wins
-          </button>
         </article>
 
         <div class="draw-column">
@@ -70,20 +71,21 @@
         </div>
 
         <article class="film-card">
-          <img
-            v-if="state.matchup.rightFilm.coverUrl"
-            :src="state.matchup.rightFilm.coverUrl"
-            :alt="`${state.matchup.rightFilm.title} poster`"
+          <button
+            class="poster-pick"
+            :disabled="loading"
+            :aria-label="`Choose ${state.matchup.rightFilm.title}`"
+            @click="submit('right')"
           >
+            <img
+              v-if="state.matchup.rightFilm.coverUrl"
+              :src="state.matchup.rightFilm.coverUrl"
+              :alt="`${state.matchup.rightFilm.title} poster`"
+            >
+          </button>
           <div class="film-title">
             {{ state.matchup.rightFilm.title }} <span v-if="state.matchup.rightFilm.year">({{ state.matchup.rightFilm.year }})</span>
           </div>
-          <button
-            :disabled="loading"
-            @click="submit('right')"
-          >
-            Right Wins
-          </button>
         </article>
       </div>
 
@@ -258,7 +260,7 @@ button {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 1rem;
-  align-items: start;
+  align-items: stretch;
   justify-items: center;
 }
 
@@ -281,14 +283,27 @@ button {
   border-radius: 0.25rem;
 }
 
+.poster-pick {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.poster-pick:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .film-title {
   font-size: 1rem;
   line-height: 1.35;
 }
 
 .draw-column {
-  display: grid;
+  display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .draw-btn {

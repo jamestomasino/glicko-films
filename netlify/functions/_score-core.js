@@ -29,7 +29,7 @@ async function getScoreState () {
       id: tournament.id,
       createdAt: tournament.created_at
     },
-    pendingCount: nextMatch.pendingCount,
+    pendingCount: Number(nextMatch.pending_count || nextMatch.pendingCount || 0),
     matchup: mapMatch(nextMatch)
   }
 }
