@@ -1,11 +1,14 @@
 const { buildAuthCookie } = require('./_score-auth')
 const { isRateLimited, getClientIp } = require('./_rate-limit')
+const { requireWriteIntent } = require('./_write-guard')
 
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
       return jsonResponse(405, { error: 'Method not allowed.' })
     }
+    const invalidWrite = requireWriteIntent(event)
+    if (invalidWrite) return invalidWrite
     const rate = isRateLimited({
       key: `score-login:${getClientIp(event)}`,
       limit: 10,

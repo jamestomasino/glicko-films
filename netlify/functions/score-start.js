@@ -1,12 +1,15 @@
 const { isAuthorized } = require('./_score-auth')
 const { startTournament } = require('./_score-core')
 const { isRateLimited, getClientIp } = require('./_rate-limit')
+const { requireWriteIntent } = require('./_write-guard')
 
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
       return jsonResponse(405, { error: 'Method not allowed.' })
     }
+    const invalidWrite = requireWriteIntent(event)
+    if (invalidWrite) return invalidWrite
     if (!isAuthorized(event)) {
       return jsonResponse(401, { error: 'Unauthorized.' })
     }

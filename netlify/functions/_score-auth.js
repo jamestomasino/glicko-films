@@ -1,6 +1,6 @@
 const crypto = require('node:crypto')
 
-const COOKIE_NAME = 'score_auth'
+const COOKIE_NAME = '__Host-score_auth'
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 30
 
 module.exports = {
@@ -11,17 +11,18 @@ module.exports = {
 }
 
 function isAuthorized (event) {
-  const password = process.env.SCORE_PASSWORD
-  if (!password) return false
+  const secret = getSessionSecret()
+  if (!secret) return false
 
-  const cookies = parseCookies(event?.headers?.cookie || '')
+  const cookieHeader = event?.headers?.cookie || event?.headers?.Cookie || ''
+  const cookies = parseCookies(cookieHeader)
   const token = cookies[COOKIE_NAME]
   if (!token) return false
 
   const [encodedPayload, signature] = token.split('.')
   if (!encodedPayload || !signature) return false
 
-  const expectedSignature = sign(encodedPayload, password)
+  const expectedSignature = sign(encodedPayload, secret)
   if (!timingSafeEqual(signature, expectedSignature)) return false
 
   let payload
@@ -38,19 +39,21 @@ function isAuthorized (event) {
 function buildAuthCookie (passwordAttempt) {
   const password = process.env.SCORE_PASSWORD
   if (!password || passwordAttempt !== password) return null
+  const secret = getSessionSecret()
+  if (!secret) return null
 
   const payload = {
     exp: Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS
   }
   const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
-  const signature = sign(encodedPayload, password)
+  const signature = sign(encodedPayload, secret)
   const token = `${encodedPayload}.${signature}`
 
-  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${MAX_AGE_SECONDS}`
+  return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${MAX_AGE_SECONDS}`
 }
 
 function clearAuthCookie () {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+  return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`
 }
 
 function sign (value, secret) {
@@ -77,4 +80,8 @@ function parseCookies (cookieHeader) {
       acc[key] = value
       return acc
     }, {})
+}
+
+function getSessionSecret () {
+  return process.env.SCORE_SESSION_SECRET || process.env.SCORE_PASSWORD || ''
 }

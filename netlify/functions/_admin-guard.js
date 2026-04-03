@@ -1,5 +1,6 @@
 const { isAuthorized } = require('./_score-auth')
 const { isRateLimited, getClientIp } = require('./_rate-limit')
+const { requireWriteIntent } = require('./_write-guard')
 
 module.exports = {
   requireAdmin
@@ -8,6 +9,10 @@ module.exports = {
 function requireAdmin (event, { method = 'GET', limit = 30, windowMs = 60_000 } = {}) {
   if (event.httpMethod !== method) {
     return jsonResponse(405, { error: 'Method not allowed.' })
+  }
+  if (method !== 'GET') {
+    const invalidWrite = requireWriteIntent(event)
+    if (invalidWrite) return invalidWrite
   }
 
   if (!isAuthorized(event)) {

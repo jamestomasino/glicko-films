@@ -173,7 +173,7 @@ export default {
         const response = await fetch('/api/score/login', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({ password: this.password })
         })
         if (!response.ok) {
@@ -222,7 +222,7 @@ export default {
         const response = await fetch('/api/score/submit', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({
             matchId: this.state.matchup.matchId,
             tournamentId: this.state.matchup.tournamentId,
@@ -246,7 +246,7 @@ export default {
         const response = await fetch('/api/score/start', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({ mode: this.startMode })
         })
         if (!response.ok) {
@@ -267,7 +267,8 @@ export default {
     async logout () {
       await fetch('/api/score/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: { 'x-film-write-intent': '1' }
       })
       this.authenticated = false
       this.state = null

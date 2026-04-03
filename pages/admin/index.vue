@@ -211,7 +211,7 @@ export default {
         const response = await fetch('/api/score/login', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({ password: this.password })
         })
         if (!response.ok) throw new Error('Invalid password.')
@@ -229,7 +229,8 @@ export default {
     async logout () {
       await fetch('/api/score/logout', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: { 'x-film-write-intent': '1' }
       })
       this.authenticated = false
       this.health = null
@@ -258,7 +259,8 @@ export default {
       await this.runAction(async () => {
         const response = await fetch('/api/admin/trakt-auth-start', {
           method: 'POST',
-          credentials: 'include'
+          credentials: 'include',
+          headers: { 'x-film-write-intent': '1' }
         })
         const payload = await response.json()
         if (!response.ok) throw new Error(payload.error || 'Failed to start Trakt auth.')
@@ -275,7 +277,7 @@ export default {
         const response = await fetch('/api/admin/trakt-auth-poll', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({ deviceCode: this.deviceAuth.deviceCode })
         })
         const payload = await response.json()
@@ -308,7 +310,7 @@ export default {
         const response = await fetch('/api/admin/intake-add', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({ tmdbId: Number(tmdbId) })
         })
         const payload = await response.json()
@@ -324,7 +326,7 @@ export default {
         const response = await fetch('/api/admin/reseed', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({
             filmId: this.filmIdInput || null,
             tmdbId: this.tmdbIdMaintInput || null,
@@ -341,7 +343,7 @@ export default {
         const response = await fetch('/api/admin/recache', {
           method: 'POST',
           credentials: 'include',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
           body: JSON.stringify({
             filmId: this.filmIdInput || null,
             tmdbId: this.tmdbIdMaintInput || null,
