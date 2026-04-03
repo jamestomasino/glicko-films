@@ -34,7 +34,16 @@
       class="battle-panel"
     >
       <header class="battle-header">
-        <h1>Head-to-Head Scoring</h1>
+        <div class="battle-header-top">
+          <h1>Head-to-Head Scoring</h1>
+          <button
+            class="logout"
+            :disabled="loading"
+            @click="logout"
+          >
+            Logout
+          </button>
+        </div>
         <p>Tournament #{{ state?.tournament?.id }} · {{ state?.pendingCount }} matches remaining</p>
       </header>
 
@@ -95,13 +104,6 @@
       >
         {{ error }}
       </p>
-      <button
-        class="logout"
-        :disabled="loading"
-        @click="logout"
-      >
-        Logout
-      </button>
     </section>
   </main>
 </template>
@@ -255,6 +257,13 @@ button {
   color: #9db0d4;
 }
 
+.battle-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .battle-grid {
   margin-top: 1rem;
   display: grid;
@@ -273,12 +282,12 @@ button {
   grid-template-rows: auto auto auto;
   gap: 0.6rem;
   width: 100%;
-  max-width: 18rem;
+  max-width: 21.5rem;
 }
 
 .film-card img {
   width: 100%;
-  max-width: 11rem;
+  max-width: 13.25rem;
   justify-self: center;
   border-radius: 0.25rem;
 }
@@ -311,7 +320,6 @@ button {
 }
 
 .logout {
-  margin-top: 1rem;
   background: transparent;
   border-color: #5a6887;
 }
@@ -327,11 +335,11 @@ button {
   }
 
   .film-card {
-    max-width: 14rem;
+    max-width: 17rem;
   }
 
   .film-card img {
-    max-width: 8.5rem;
+    max-width: 10.25rem;
   }
 
   .draw-column {
