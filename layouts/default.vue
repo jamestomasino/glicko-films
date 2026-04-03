@@ -47,6 +47,7 @@ export default {
     bodyTag = document.getElementsByTagName('body')[0]
     bodyTag.classList.remove('killscroll')
     this.refreshScoreSession()
+    window.addEventListener('score-auth-changed', this.refreshScoreSession)
 
     if (this.getParameterByName('screenshot')) {
       bodyTag.classList.add('screenshot')
@@ -57,6 +58,9 @@ export default {
     if (this.$nuxt.$route.hash) {
       this.scrollToHash()
     }
+  },
+  beforeDestroy () {
+    window.removeEventListener('score-auth-changed', this.refreshScoreSession)
   },
   methods: {
     async refreshScoreSession () {

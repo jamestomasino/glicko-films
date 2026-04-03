@@ -3,10 +3,12 @@ const { neon } = require('@netlify/neon')
 
 const DEFAULT_POOL_SIZE = 12
 const DEFAULT_COOLDOWN_DAYS = 30
+const DEFAULT_SWISS_ROUNDS = 4
 
 module.exports = {
   getScoreState,
-  submitScore
+  submitScore,
+  startTournament
 }
 
 async function getScoreState () {
@@ -14,24 +16,52 @@ async function getScoreState () {
   let tournament = await getActiveTournament(sql)
 
   if (!tournament) {
-    tournament = await createTournament(sql)
+    return {
+      tournament: null,
+      pendingCount: 0,
+      matchup: null,
+      needsStart: true,
+      modes: availableModes()
+    }
   }
 
   let nextMatch = await getNextPendingMatch(sql, tournament.id)
   if (!nextMatch) {
     await applyTournamentResults(sql, tournament.id)
-    tournament = await createTournament(sql)
-    nextMatch = await getNextPendingMatch(sql, tournament.id)
+    return {
+      tournament: {
+        id: tournament.id,
+        createdAt: tournament.created_at,
+        strategy: tournament.strategy
+      },
+      pendingCount: 0,
+      matchup: null,
+      needsStart: true,
+      justCompleted: true,
+      modes: availableModes()
+    }
   }
 
   return {
     tournament: {
       id: tournament.id,
-      createdAt: tournament.created_at
+      createdAt: tournament.created_at,
+      strategy: tournament.strategy
     },
     pendingCount: Number(nextMatch.pending_count || nextMatch.pendingCount || 0),
-    matchup: mapMatch(nextMatch)
+    matchup: mapMatch(nextMatch),
+    needsStart: false,
+    modes: availableModes()
   }
+}
+
+async function startTournament ({ mode } = {}) {
+  const sql = neon()
+  const active = await getActiveTournament(sql)
+  if (!active) {
+    await createTournament(sql, { mode })
+  }
+  return getScoreState()
 }
 
 async function submitScore ({ matchId, tournamentId, outcome }) {
@@ -78,9 +108,12 @@ async function getActiveTournament (sql) {
   return rows[0] || null
 }
 
-async function createTournament (sql) {
+async function createTournament (sql, { mode } = {}) {
+  const selectedMode = normalizeMode(mode)
   const cooldownDays = parseIntEnv('SCORE_PAIR_COOLDOWN_DAYS', DEFAULT_COOLDOWN_DAYS, 1, 365)
-  const poolSize = parseIntEnv('SCORE_TOURNAMENT_POOL_SIZE', DEFAULT_POOL_SIZE, 4, 24)
+  const basePoolSize = parseIntEnv('SCORE_TOURNAMENT_POOL_SIZE', DEFAULT_POOL_SIZE, 4, 24)
+  const widePoolSize = parseIntEnv('SCORE_WIDE_POOL_SIZE', Math.min(24, basePoolSize + 6), 4, 24)
+  const poolSize = selectedMode === 'wide' ? widePoolSize : basePoolSize
 
   const films = await sql.query(
     `select
@@ -98,16 +131,24 @@ async function createTournament (sql) {
   }
 
   const recentPairs = await loadRecentPairSet(sql, cooldownDays)
-  const selectedFilms = selectSimilarityPool(films, poolSize, recentPairs)
+  const selectedFilms = selectedMode === 'wide'
+    ? selectWideSpreadPool(films, poolSize, recentPairs)
+    : selectSimilarityPool(films, poolSize, recentPairs)
   if (selectedFilms.length < 2) {
     throw new Error('Unable to build tournament pool.')
   }
 
+  const strategy = selectedMode === 'wide'
+    ? 'wide_spread_v1'
+    : selectedMode === 'swiss'
+      ? 'swiss_v1'
+      : 'similarity_v1'
+
   const [insertedTournament] = await sql.query(
     `insert into score_tournaments (status, strategy, pool_size, cooldown_days)
-     values ('active', 'similarity_v1', $1, $2)
+     values ('active', $1, $2, $3)
      returning *`,
-    [selectedFilms.length, cooldownDays]
+    [strategy, selectedFilms.length, cooldownDays]
   )
 
   for (const film of selectedFilms) {
@@ -118,14 +159,10 @@ async function createTournament (sql) {
     )
   }
 
-  const pairRows = []
-  for (let i = 0; i < selectedFilms.length; i += 1) {
-    for (let j = i + 1; j < selectedFilms.length; j += 1) {
-      const low = Math.min(selectedFilms[i].id, selectedFilms[j].id)
-      const high = Math.max(selectedFilms[i].id, selectedFilms[j].id)
-      pairRows.push([insertedTournament.id, low, high])
-    }
-  }
+  const swissRounds = parseIntEnv('SCORE_SWISS_ROUNDS', DEFAULT_SWISS_ROUNDS, 2, 12)
+  const pairRows = selectedMode === 'swiss'
+    ? buildSwissPairRows(selectedFilms, recentPairs, swissRounds, insertedTournament.id)
+    : buildRoundRobinPairRows(selectedFilms, insertedTournament.id)
 
   for (const [tournamentId, lowId, highId] of pairRows) {
     await sql.query(
@@ -315,6 +352,112 @@ function selectSimilarityPool (films, poolSize, recentPairs) {
   return chosen
 }
 
+function selectWideSpreadPool (films, poolSize, recentPairs) {
+  const sorted = [...films]
+    .map((film) => ({ ...film, jitter: Math.random() }))
+    .sort((a, b) => (Number(a.rating) - Number(b.rating)) || (a.jitter - b.jitter))
+
+  const chosen = []
+  const seen = new Set()
+  let left = 0
+  let right = sorted.length - 1
+
+  while (left <= right && chosen.length < poolSize) {
+    const candidates = [sorted[left], sorted[right]]
+      .filter(Boolean)
+      .filter((film) => !seen.has(film.id))
+
+    for (const candidate of candidates) {
+      const valid = chosen.every((existing) => !recentPairs.has(pairKey(candidate.id, existing.id)))
+      if (!valid) continue
+      chosen.push(candidate)
+      seen.add(candidate.id)
+      if (chosen.length >= poolSize) break
+    }
+
+    left += 1
+    right -= 1
+  }
+
+  if (chosen.length < poolSize) {
+    for (const candidate of sorted) {
+      if (seen.has(candidate.id)) continue
+      chosen.push(candidate)
+      seen.add(candidate.id)
+      if (chosen.length >= poolSize) break
+    }
+  }
+
+  return chosen
+}
+
+function buildRoundRobinPairRows (films, tournamentId) {
+  const pairRows = []
+  for (let i = 0; i < films.length; i += 1) {
+    for (let j = i + 1; j < films.length; j += 1) {
+      const low = Math.min(films[i].id, films[j].id)
+      const high = Math.max(films[i].id, films[j].id)
+      pairRows.push([tournamentId, low, high])
+    }
+  }
+  return pairRows
+}
+
+function buildSwissPairRows (films, recentPairs, rounds, tournamentId) {
+  const sorted = [...films].sort((a, b) => Number(b.rating) - Number(a.rating))
+  const schedule = buildRoundSchedule(sorted, rounds)
+  const pairs = []
+  const seen = new Set()
+
+  for (const [a, b] of schedule) {
+    const key = pairKey(a.id, b.id)
+    if (seen.has(key)) continue
+    if (recentPairs.has(key)) continue
+    seen.add(key)
+    pairs.push([tournamentId, Math.min(a.id, b.id), Math.max(a.id, b.id)])
+  }
+
+  if (pairs.length >= Math.max(1, Math.floor(sorted.length / 2))) {
+    return pairs
+  }
+
+  const relaxed = []
+  const relaxedSeen = new Set()
+  for (const [a, b] of schedule) {
+    const key = pairKey(a.id, b.id)
+    if (relaxedSeen.has(key)) continue
+    relaxedSeen.add(key)
+    relaxed.push([tournamentId, Math.min(a.id, b.id), Math.max(a.id, b.id)])
+  }
+  return relaxed
+}
+
+function buildRoundSchedule (films, rounds) {
+  const entries = [...films]
+  if (entries.length % 2 !== 0) entries.push(null)
+  if (entries.length < 2) return []
+
+  const maxRounds = entries.length - 1
+  const useRounds = Math.min(maxRounds, Math.max(1, rounds))
+  const schedule = []
+
+  for (let round = 0; round < useRounds; round += 1) {
+    const half = entries.length / 2
+    for (let i = 0; i < half; i += 1) {
+      const left = entries[i]
+      const right = entries[entries.length - 1 - i]
+      if (!left || !right) continue
+      schedule.push([left, right])
+    }
+    const fixed = entries[0]
+    const rest = entries.slice(1)
+    rest.unshift(rest.pop())
+    entries.splice(0, entries.length, fixed, ...rest)
+  }
+
+  return schedule
+}
+
 function mapMatch (row) {
   return {
     matchId: Number(row.match_id),
@@ -351,4 +494,17 @@ function parseIntEnv (name, fallback, min, max) {
   const parsed = Number.parseInt(process.env[name] || '', 10)
   if (Number.isNaN(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
+}
+
+function normalizeMode (mode) {
+  if (mode === 'wide' || mode === 'swiss') return mode
+  return 'normal'
+}
+
+function availableModes () {
+  return [
+    { id: 'normal', label: 'Normal', description: 'Current pool rules with full round-robin pairs.' },
+    { id: 'wide', label: 'Wide Spread', description: 'Broader Elo spread in the tournament pool.' },
+    { id: 'swiss', label: 'Swiss-Style', description: 'Seeded rounds with fewer total pairings.' }
+  ]
 }

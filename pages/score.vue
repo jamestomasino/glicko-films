@@ -44,7 +44,9 @@
             Logout
           </button>
         </div>
-        <p>Tournament #{{ state?.tournament?.id }} · {{ state?.pendingCount }} matches remaining</p>
+        <p v-if="state?.matchup">Tournament #{{ state?.tournament?.id }} · {{ state?.pendingCount }} matches remaining · {{ strategyLabel(state?.tournament?.strategy) }}</p>
+        <p v-else-if="state?.justCompleted">Tournament #{{ state?.tournament?.id }} complete. Ratings applied.</p>
+        <p v-else>No active tournament.</p>
       </header>
 
       <div
@@ -98,6 +100,36 @@
         </article>
       </div>
 
+      <section
+        v-else
+        class="start-panel"
+      >
+        <h2>Ready for a new batch?</h2>
+        <p>Start a tournament when you want to continue scoring.</p>
+        <div class="mode-grid">
+          <label
+            v-for="mode in state?.modes || []"
+            :key="mode.id"
+            class="mode-option"
+          >
+            <input
+              v-model="startMode"
+              type="radio"
+              name="start-mode"
+              :value="mode.id"
+            >
+            <span class="mode-title">{{ mode.label }}</span>
+            <span class="mode-description">{{ mode.description }}</span>
+          </label>
+        </div>
+        <button
+          :disabled="loading"
+          @click="startTournament"
+        >
+          Start {{ selectedModeLabel }} Tournament
+        </button>
+      </section>
+
       <p
         v-if="error"
         class="error"
@@ -116,6 +148,7 @@ export default {
       authenticated: false,
       password: '',
       state: null,
+      startMode: 'normal',
       error: '',
       loading: false
     }
@@ -148,6 +181,7 @@ export default {
         }
         this.password = ''
         this.authenticated = true
+        window.dispatchEvent(new Event('score-auth-changed'))
         await this.loadState()
       } catch (error) {
         this.error = error.message || 'Login failed.'
@@ -171,6 +205,8 @@ export default {
           throw new Error('Failed to load scoring state.')
         }
         this.state = await response.json()
+        if (this.state?.modes?.some((mode) => mode.id === this.startMode)) return
+        this.startMode = this.state?.modes?.[0]?.id || 'normal'
       } catch (error) {
         this.error = error.message || 'Failed to load scoring state.'
       } finally {
@@ -203,6 +239,31 @@ export default {
         this.loading = false
       }
     },
+    async startTournament () {
+      this.loading = true
+      this.error = ''
+      try {
+        const response = await fetch('/api/score/start', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mode: this.startMode })
+        })
+        if (!response.ok) {
+          throw new Error('Failed to start tournament.')
+        }
+        this.state = await response.json()
+      } catch (error) {
+        this.error = error.message || 'Failed to start tournament.'
+      } finally {
+        this.loading = false
+      }
+    },
+    strategyLabel (strategy) {
+      if (strategy === 'wide_spread_v1') return 'Wide Spread'
+      if (strategy === 'swiss_v1') return 'Swiss-Style'
+      return 'Normal'
+    },
     async logout () {
       await fetch('/api/score/logout', {
         method: 'POST',
@@ -211,6 +272,14 @@ export default {
       this.authenticated = false
       this.state = null
       this.password = ''
+      this.startMode = 'normal'
+      window.dispatchEvent(new Event('score-auth-changed'))
+    }
+  },
+  computed: {
+    selectedModeLabel () {
+      const match = this.state?.modes?.find((mode) => mode.id === this.startMode)
+      return match?.label || 'Normal'
     }
   }
 }
@@ -319,6 +388,55 @@ button {
   min-width: 6rem;
 }
 
+.start-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(114, 140, 201, 0.35);
+  border-radius: 0.35rem;
+  background: rgba(17, 27, 54, 0.75);
+}
+
+.start-panel h2 {
+  margin: 0 0 0.5rem;
+}
+
+.start-panel p {
+  margin: 0 0 0.9rem;
+  color: #9db0d4;
+}
+
+.mode-grid {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.mode-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.55rem;
+  row-gap: 0.2rem;
+  align-items: start;
+  padding: 0.55rem;
+  border: 1px solid rgba(114, 140, 201, 0.35);
+  border-radius: 0.3rem;
+  background: rgba(10, 16, 34, 0.35);
+}
+
+.mode-option input {
+  margin-top: 0.15rem;
+}
+
+.mode-title {
+  font-weight: 600;
+}
+
+.mode-description {
+  grid-column: 2;
+  font-size: 0.9rem;
+  color: #9db0d4;
+}
+
 .logout {
   background: transparent;
   border-color: #5a6887;
@@ -330,20 +448,59 @@ button {
 }
 
 @media (max-width: 900px) {
+  .score-page {
+    padding: 0.9rem 0.5rem 1.4rem;
+  }
+
+  .battle-header-top {
+    gap: 0.6rem;
+  }
+
+  .battle-header h1 {
+    font-size: 1.15rem;
+    margin: 0;
+  }
+
+  .battle-header p {
+    font-size: 0.85rem;
+    margin: 0.35rem 0 0;
+  }
+
   .battle-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0.35rem;
+    align-items: center;
   }
 
   .film-card {
-    max-width: 17rem;
+    max-width: none;
+    padding: 0.35rem;
+    gap: 0.3rem;
+  }
+
+  .film-title {
+    font-size: 0.78rem;
+    line-height: 1.15;
   }
 
   .film-card img {
-    max-width: 10.25rem;
+    max-width: min(43vw, 8.6rem);
   }
 
   .draw-column {
     justify-content: center;
+  }
+
+  .draw-btn {
+    min-width: 3.8rem;
+    padding: 0.45rem 0.45rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .film-card img {
+    max-width: min(42vw, 8rem);
   }
 }
 </style>

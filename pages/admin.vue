@@ -181,6 +181,7 @@ export default {
         if (!response.ok) throw new Error('Invalid password.')
         this.password = ''
         this.authenticated = true
+        window.dispatchEvent(new Event('score-auth-changed'))
         await this.loadHealth()
       } catch (error) {
         this.error = error.message || 'Login failed.'
@@ -196,6 +197,7 @@ export default {
       this.authenticated = false
       this.health = null
       this.searchResults = []
+      window.dispatchEvent(new Event('score-auth-changed'))
     },
     async loadHealth () {
       await this.runAction(async () => {
