@@ -1,58 +1,99 @@
 <template>
-  <div class="content">
-    <h1>
-      Tomasino Glicko-2 Film Rankings
-    </h1>
-    <hr>
-    <p>
-      This site is designed to showcase my watched films list, ranking them from best to worst using the <a href="https://en.wikipedia.org/wiki/Glicko_rating_system">Glicko-2 Rating System</a>. It is an ELO-like system commonly used to rank chess players. This site is an experiment designed to apply that system to my film reviews.
+  <main class="rankings-page">
+    <header class="page-header">
+      <h1>Tomasino Film Rankings</h1>
+      <p>Ordered by current rating. Showing {{ films.length }} of {{ total || '...' }} films.</p>
+    </header>
+
+    <ol class="film-list">
+      <li
+        v-for="film in films"
+        :key="film.id"
+        class="film-row"
+      >
+        <span class="position">{{ film.position }}</span>
+        <a
+          v-if="film.tmdbUrl"
+          class="poster-link"
+          :href="film.tmdbUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          :aria-label="`Open ${film.title} on TMDb`"
+        >
+          <img
+            v-if="film.thumbnailUrl"
+            class="poster"
+            :src="film.thumbnailUrl"
+            :alt="`${film.title} poster`"
+            loading="lazy"
+            decoding="async"
+          >
+          <div
+            v-else
+            class="poster-fallback"
+            aria-hidden="true"
+          />
+        </a>
+        <div
+          v-else
+          class="poster-fallback"
+          aria-hidden="true"
+        />
+
+        <div class="film-meta">
+          <div class="title">{{ film.title }}</div>
+          <div
+            v-if="film.year"
+            class="year"
+          >
+            {{ film.year }}
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <div
+      ref="sentinel"
+      class="sentinel"
+      aria-hidden="true"
+    />
+
+    <p
+      v-if="loading"
+      class="status"
+    >
+      Loading more films...
     </p>
-    <p>
-      To perform these rankings a small number of participants from my wached-films list will be selected for a "ranking tournament". These 10-15 films will be set head-to-head against one another in matches where I will indicate if I prefer one over the other, or whether they tie. Over the course of a tournament each film will compare against each of the others and at the conclusion their rankings will update. Over time these tournaments will sort and reveal my preferences and the rankings will take shape with increasing confidence.
+    <p
+      v-else-if="error"
+      class="status status-error"
+    >
+      {{ error }}
     </p>
-    <p>
-      The process for this ranking system involves a lot of head-to-head matches before the list reaches a reliable threshhold. As such, it is unlikely to appeal to others for their own personal use. I've decided to keep this site for my personal use only as a result. If you are interested in replicating it, though, all of the code is open source.
+    <p
+      v-else-if="!hasMore && films.length > 0"
+      class="status"
+    >
+      End of list.
     </p>
-    <h2>
-      TODO:
-    </h2>
-    <ul>
-      <li>[x] Create repo</li>
-      <li>[x] Connect to netlify</li>
-      <li>[x] Connect to Netlify Neon database</li>
-      <ul>
-        <li>[x] Initialize database via Netlify CLI</li>
-        <li>[x] Add Drizzle ORM schema and migrations</li>
-      </ul>
-      <li>[ ] Connect to letterboxd API - (In private beta, may not be feasible)</li>
-      <ul>
-        <li>[ ] Fetch watchlist of user</li>
-        <li>[ ] Parse fetched data to fill and append film list into Neon</li>
-        <li>[ ] Estimate provisional Glicko-2 ranking based on film stars on letterboxd</li>
-        <li>[x] Alternatively, export data from Letterboxd and process it into Neon from CLI</li>
-      </ul>
-      <li>[ ] Create a public list of all the films and their ranking</li>
-      <li>[ ] Add an auth mechanism so we can rank and rate films but others can't</li>
-      <li>[ ] Create film vs film match</li>
-      <ul>
-        <li>[ ] Front-end display of film vs film (can we fetch movie art?)</li>
-        <li>[ ] Allow 1-0, 0-1, or 0.5-0.5 results</li>
-      </ul>
-      <li>[ ] Create tourney of matches (10-15 matches per film preferred) - Formula: N(N-1)/2</li>
-      <ul>
-        <li>[ ] Default every film matches against every other in tourney</li>
-        <li>[ ] Add option for <a href="https://en.wikipedia.org/wiki/Swiss-system_tournament">Swiss-system tournaments</a></li>
-        <li>[ ] Modify tourney to allow variable spread in Glicko-2 pairings</li>
-        <li>[ ] Weigh tourney selection inversely by tourney participation</li>
-        <li>[ ] Update Glicko-2 ratings after tourney conclusion, not individual match</li>
-      </ul>
-    </ul>
-  </div>
+  </main>
 </template>
 
 <script>
 export default {
   name: 'HomePage',
+  data () {
+    return {
+      films: [],
+      total: 0,
+      offset: 0,
+      limit: 100,
+      loading: false,
+      hasMore: true,
+      error: '',
+      observer: null
+    }
+  },
   head () {
     return {
       title: 'Tomasino Film Rankings',
@@ -60,10 +101,10 @@ export default {
         { hid: 'ogtitle', property: 'og:title', content: 'Tomasino Film Rankings' },
         { hid: 'twtitle', name: 'twitter:title', content: 'Tomasino Film Rankings' },
         { hid: 'googlename', itemprop: 'name', content: 'Tomasino Film Rankings' },
-        { hid: 'description', name: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'ogdescription', property: 'og:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'twdescription', name: 'twitter:description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
-        { hid: 'googledescription', itemprop: 'description', content: 'A glicko2 algorithm powered ranking tool for personal film preferences' },
+        { hid: 'description', name: 'description', content: 'Personal film rankings with infinite scroll and TMDb links.' },
+        { hid: 'ogdescription', property: 'og:description', content: 'Personal film rankings with infinite scroll and TMDb links.' },
+        { hid: 'twdescription', name: 'twitter:description', content: 'Personal film rankings with infinite scroll and TMDb links.' },
+        { hid: 'googledescription', itemprop: 'description', content: 'Personal film rankings with infinite scroll and TMDb links.' },
         { hid: 'ogurl', property: 'og:url', content: 'https://films.tomasino.org' + this.$route.path },
         { hid: 'twsite', name: 'twitter:site', content: 'https://films.tomasino.org' + this.$route.path }
       ],
@@ -71,41 +112,183 @@ export default {
         { hid: 'canonical', rel: 'canonical', href: 'https://films.tomasino.org' + this.$route.path }
       ]
     }
+  },
+  async mounted () {
+    await this.fetchNextPage()
+    this.setupInfiniteScroll()
+  },
+  beforeDestroy () {
+    if (this.observer) {
+      this.observer.disconnect()
+      this.observer = null
+    }
+  },
+  methods: {
+    async fetchNextPage () {
+      if (this.loading || !this.hasMore) return
+
+      this.loading = true
+      this.error = ''
+
+      try {
+        const response = await fetch(`/api/films?offset=${this.offset}&limit=${this.limit}`)
+        if (!response.ok) {
+          throw new Error(`Request failed (${response.status})`)
+        }
+
+        const payload = await response.json()
+        const items = Array.isArray(payload.items) ? payload.items : []
+
+        this.films = this.films.concat(items)
+        this.offset += items.length
+        this.total = Number(payload.total) || this.total
+        this.hasMore = Boolean(payload.hasMore)
+      } catch (err) {
+        this.error = 'Could not load films right now.'
+        this.hasMore = false
+      } finally {
+        this.loading = false
+      }
+    },
+    setupInfiniteScroll () {
+      if (!window.IntersectionObserver || !this.$refs.sentinel) return
+
+      this.observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          this.fetchNextPage()
+        }
+      }, {
+        rootMargin: '600px 0px'
+      })
+
+      this.observer.observe(this.$refs.sentinel)
+    }
   }
 }
 </script>
+
 <style lang="scss">
-.content {
-  position: static;
-  display: flex;
-  justify-content: center;
+.rankings-page {
+  min-height: 100vh;
+  padding: 1.5rem 1rem 3rem;
+  color: #eef0f2;
+  background: radial-gradient(circle at 10% 10%, #11353f 0%, #0a1720 40%, #060d12 100%);
+}
+
+.page-header {
+  max-width: 60rem;
+  margin: 0 auto 1.5rem;
+
+  h1 {
+    margin: 0 0 0.4rem;
+    font-size: clamp(1.6rem, 3.6vw, 2.3rem);
+    line-height: 1.1;
+  }
+
+  p {
+    margin: 0;
+    color: #9eb6c0;
+    font-size: 0.95rem;
+  }
+}
+
+.film-list {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.film-row {
+  display: grid;
+  grid-template-columns: 3.5rem 4rem 1fr;
+  gap: 0.85rem;
   align-items: center;
+  padding: 0.5rem;
+  border-bottom: 1px solid rgba(158, 182, 192, 0.16);
+}
+
+.position {
+  display: inline-flex;
+  justify-content: flex-end;
+  color: #7eb4c2;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.poster-link {
+  display: inline-block;
+  width: 100%;
+  max-width: 4rem;
+}
+
+.poster {
   display: block;
-  background: rgb(2,0,36);
-  background: linear-gradient(104deg, rgba(2,0,36,1) 0%, rgba(64,9,121,1) 35%, rgba(12,98,101,1) 100%);
-  height: 100vh;
-  color: white;
-  padding: 20px;
-  font-size: 18px;
-  line-height: 22px;
-  overflow: scroll;
+  width: 100%;
+  height: auto;
+  border-radius: 0.25rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }
-h1 {
-  margin-bottom: 2rem;
-  font-size: 36px;
-  line-height: 40px;
+
+.poster-fallback {
+  width: 4rem;
+  height: 6rem;
+  border-radius: 0.25rem;
+  background: linear-gradient(145deg, #3a4a53, #222f36);
 }
-hr {
-  margin-bottom: 2rem;
+
+.film-meta {
+  min-width: 0;
 }
-li {
-  font-family: Consolas, "Andale Mono WT", "Andale Mono", "Lucida Console", "Lucida Sans Typewriter", "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", "Nimbus Mono L", Monaco, "Courier New", Courier, monospace;
+
+.title {
+  font-size: 1rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-a {
-  color: #f8a6ff;
+
+.year {
+  margin-top: 0.15rem;
+  color: #93a9b3;
+  font-size: 0.85rem;
 }
-p {
-  max-width: 80rem;
-  margin-bottom: 1rem;
+
+.sentinel {
+  height: 1px;
+}
+
+.status {
+  max-width: 60rem;
+  margin: 1.2rem auto 0;
+  color: #9eb6c0;
+  font-size: 0.92rem;
+}
+
+.status-error {
+  color: #ff8f8f;
+}
+
+@media (max-width: 640px) {
+  .film-row {
+    grid-template-columns: 2.8rem 3.4rem 1fr;
+    gap: 0.65rem;
+  }
+
+  .poster-link,
+  .poster-fallback {
+    max-width: 3.4rem;
+    width: 3.4rem;
+    height: auto;
+  }
+
+  .poster-fallback {
+    height: 5.1rem;
+  }
+
+  .title {
+    font-size: 0.95rem;
+  }
 }
 </style>

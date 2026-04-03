@@ -27,9 +27,12 @@
     "generate": "NODE_OPTIONS=--openssl-legacy-provider nuxt generate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "npx netlify dev:exec drizzle-kit migrate",
-    "db:studio": "npx netlify dev:exec drizzle-kit studio"
+    "db:studio": "npx netlify dev:exec drizzle-kit studio",
+    "seed:elo": "npx netlify dev:exec -- node scripts/seed-tmdb-elo.mjs",
+    "cache:images": "npx netlify dev:exec -- node scripts/cache-film-images.mjs"
   },
   "dependencies": {
+    "@netlify/blobs": "^10.7.4",
     "@netlify/neon": "^0.1.2",
     "@nuxtjs/robots": "^2.5.0",
     "@nuxtjs/sitemap": "^2.4.0",
