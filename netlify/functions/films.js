@@ -18,6 +18,7 @@ exports.handler = async (event) => {
           tmdb_id,
           poster_thumb_blob_key,
           poster_cover_blob_key,
+          coalesce(glicko_rating, elo_seed, 1500) as rating_value,
           row_number() over (
             order by coalesce(glicko_rating, elo_seed, 1500) desc, title asc, id asc
           ) as position
@@ -30,6 +31,7 @@ exports.handler = async (event) => {
         tmdb_id,
         poster_thumb_blob_key,
         poster_cover_blob_key,
+        rating_value,
         position
       from ranked
       order by position asc
@@ -43,6 +45,7 @@ exports.handler = async (event) => {
       position: Number(film.position),
       title: film.title,
       year: film.year ? Number(film.year) : null,
+      elo: Math.round(Number(film.rating_value || 1500)),
       tmdbId: film.tmdb_id ? Number(film.tmdb_id) : null,
       tmdbUrl: film.tmdb_id ? `https://www.themoviedb.org/movie/${film.tmdb_id}` : null,
       thumbnailUrl: film.poster_thumb_blob_key

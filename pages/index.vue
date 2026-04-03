@@ -42,11 +42,14 @@
 
         <div class="film-meta">
           <div class="title">{{ film.title }}</div>
-          <div
-            v-if="film.year"
-            class="year"
-          >
-            {{ film.year }}
+          <div class="subline">
+            <span
+              v-if="film.year"
+              class="year"
+            >
+              {{ film.year }}
+            </span>
+            <span class="elo">Elo {{ film.elo }}</span>
           </div>
         </div>
       </li>
@@ -250,9 +253,21 @@ export default {
 }
 
 .year {
-  margin-top: 0.15rem;
   color: #93a9b3;
   font-size: 0.85rem;
+}
+
+.subline {
+  margin-top: 0.15rem;
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.elo {
+  font-size: 0.82rem;
+  color: #72c5de;
+  font-variant-numeric: tabular-nums;
 }
 
 .sentinel {
