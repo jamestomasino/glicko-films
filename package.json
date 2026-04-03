@@ -26,8 +26,8 @@
     "start": "nuxt start",
     "generate": "NODE_OPTIONS=--openssl-legacy-provider nuxt generate",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "netlify dev:exec drizzle-kit migrate",
-    "db:studio": "netlify dev:exec drizzle-kit studio"
+    "db:migrate": "npx netlify dev:exec drizzle-kit migrate",
+    "db:studio": "npx netlify dev:exec drizzle-kit studio"
   },
   "dependencies": {
     "@netlify/neon": "^0.1.2",
