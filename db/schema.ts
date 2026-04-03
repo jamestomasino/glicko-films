@@ -56,3 +56,34 @@ export const filmWatchEvents = pgTable('film_watch_events', {
   source: varchar({ length: 32 }).notNull().default('trakt_export'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
 })
+
+export const scoreTournaments = pgTable('score_tournaments', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  status: varchar({ length: 24 }).notNull().default('active'),
+  strategy: varchar({ length: 32 }).notNull().default('similarity_v1'),
+  poolSize: integer('pool_size').notNull().default(12),
+  cooldownDays: integer('cooldown_days').notNull().default(30),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  appliedAt: timestamp('applied_at', { withTimezone: true })
+})
+
+export const scoreTournamentEntries = pgTable('score_tournament_entries', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  tournamentId: integer('tournament_id').notNull().references(() => scoreTournaments.id, { onDelete: 'cascade' }),
+  filmId: integer('film_id').notNull().references(() => films.id, { onDelete: 'cascade' }),
+  startRating: real('start_rating').notNull(),
+  startRd: real('start_rd').notNull(),
+  startVolatility: real('start_volatility').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+})
+
+export const scoreMatches = pgTable('score_matches', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  tournamentId: integer('tournament_id').notNull().references(() => scoreTournaments.id, { onDelete: 'cascade' }),
+  filmLowId: integer('film_low_id').notNull().references(() => films.id, { onDelete: 'cascade' }),
+  filmHighId: integer('film_high_id').notNull().references(() => films.id, { onDelete: 'cascade' }),
+  scoreLow: real('score_low'),
+  ratedAt: timestamp('rated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow()
+})
