@@ -15,6 +15,9 @@ export default function AdminPage() {
   const [tmdbIdInput, setTmdbIdInput] = useState('')
   const [filmIdInput, setFilmIdInput] = useState('')
   const [tmdbIdMaintInput, setTmdbIdMaintInput] = useState('')
+  const [manualEloInput, setManualEloInput] = useState('')
+  const [maintSearchQuery, setMaintSearchQuery] = useState('')
+  const [maintSearchResults, setMaintSearchResults] = useState([])
 
   useEffect(() => {
     document.title = 'Admin · Tomasino Film Rankings'
@@ -84,6 +87,7 @@ export default function AdminPage() {
     setJobs([])
     setDeviceAuth({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
     setSearchResults([])
+    setMaintSearchResults([])
     window.dispatchEvent(new Event('score-auth-changed'))
   }
 
@@ -276,6 +280,48 @@ export default function AdminPage() {
     })
   }
 
+  async function searchMaintenanceFilms(event) {
+    event.preventDefault()
+    await runAction(async () => {
+      const q = maintSearchQuery.trim()
+      if (q.length < 2) throw new Error('Maintenance search query must be at least 2 characters.')
+      const response = await fetch(`/api/admin/film-search?q=${encodeURIComponent(q)}&limit=20`, { credentials: 'include' })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Film search failed.')
+      setMaintSearchResults(Array.isArray(payload.items) ? payload.items : [])
+      setSuccess(`Found ${(payload.items || []).length} maintenance match(es).`)
+    })
+  }
+
+  function useMaintenanceFilm(item) {
+    setFilmIdInput(String(item.id || ''))
+    setTmdbIdMaintInput(item.tmdbId ? String(item.tmdbId) : '')
+    const current = Number.isFinite(Number(item.glicko)) ? Number(item.glicko) : Number(item.elo)
+    setManualEloInput(Number.isFinite(current) ? String(Math.round(current)) : '')
+  }
+
+  async function setManualElo() {
+    await runAction(async () => {
+      const response = await fetch('/api/admin/set-elo', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
+        body: JSON.stringify({
+          filmId: filmIdInput ? Number(filmIdInput) : null,
+          tmdbId: tmdbIdMaintInput ? Number(tmdbIdMaintInput) : null,
+          elo: manualEloInput ? Number(manualEloInput) : null
+        })
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Set Elo failed.')
+      setSuccess(`Set Elo for ${payload.film.title} to ${payload.elo}. Reset ${payload.deletedMatchCount || 0} match(es).`)
+      setFilmIdInput(String(payload.film.id))
+      setTmdbIdMaintInput(payload.film.tmdbId ? String(payload.film.tmdbId) : '')
+      setManualEloInput(String(payload.elo))
+      await loadHealth()
+    })
+  }
+
   if (!authenticated) {
     return (
       <div className="c-shell admin-page">
@@ -409,15 +455,37 @@ export default function AdminPage() {
       <section className="c-card admin-card">
         <div className="c-card-header"><h2>Film Maintenance</h2></div>
         <div className="c-card-body">
+          <form className="inline-form" onSubmit={searchMaintenanceFilms}>
+            <input className="c-input" value={maintSearchQuery} onChange={(event) => setMaintSearchQuery(event.target.value)} type="text" placeholder="Find film by title, Film ID, or TMDb ID" />
+            <button className="c-button" disabled={loading || maintSearchQuery.trim().length < 2} type="submit">Find Film</button>
+          </form>
+          {maintSearchResults.length
+            ? (
+              <ul className="results">
+                {maintSearchResults.map((item) => (
+                  <li key={item.id} className="result-row">
+                    <div className="meta">
+                      <strong>{item.title}</strong>
+                      {item.year ? <span> ({item.year})</span> : null}
+                      <small>Film #{item.id}{item.tmdbId ? ` · TMDb ${item.tmdbId}` : ''} · Elo {item.glicko ?? item.elo ?? 'n/a'} · Matches {item.matches || 0}</small>
+                    </div>
+                    <button className="c-button-quiet" disabled={loading} onClick={() => useMaintenanceFilm(item)}>Use</button>
+                  </li>
+                ))}
+              </ul>
+              )
+            : null}
           <div className="inline-form">
             <input className="c-input" value={filmIdInput} onChange={(event) => setFilmIdInput(event.target.value)} type="number" min="1" placeholder="Film ID" />
             <input className="c-input" value={tmdbIdMaintInput} onChange={(event) => setTmdbIdMaintInput(event.target.value)} type="number" min="1" placeholder="TMDb ID (optional)" />
+            <input className="c-input" value={manualEloInput} onChange={(event) => setManualEloInput(event.target.value)} type="number" min="600" max="3000" placeholder="Manual Elo" />
           </div>
           <div className="inline-form">
             <button className="c-button-quiet" disabled={loading || (!filmIdInput && !tmdbIdMaintInput)} onClick={() => reseed(false)}>Reseed</button>
             <button className="c-button-quiet" disabled={loading || (!filmIdInput && !tmdbIdMaintInput)} onClick={() => reseed(true)}>Reseed + Reset Glicko</button>
             <button className="c-button-quiet" disabled={loading || (!filmIdInput && !tmdbIdMaintInput)} onClick={() => recache(false)}>Recache</button>
             <button className="c-button-quiet" disabled={loading || (!filmIdInput && !tmdbIdMaintInput)} onClick={() => recache(true)}>Force Recache</button>
+            <button className="c-button" disabled={loading || (!filmIdInput && !tmdbIdMaintInput) || !manualEloInput} onClick={setManualElo}>Set Elo + Reset History</button>
           </div>
         </div>
       </section>
