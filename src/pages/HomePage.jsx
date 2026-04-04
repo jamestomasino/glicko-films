@@ -250,7 +250,7 @@ export default function HomePage() {
                   aria-label={`Open ${film.title} on TMDb`}
                 >
                   {film.thumbnailUrl
-                    ? <img className="poster" src={film.thumbnailUrl} alt={`${film.title} poster`} loading="lazy" decoding="async" />
+                    ? <img className="poster" src={film.thumbnailUrl} alt={`${film.title} poster`} loading="lazy" decoding="async" width="200" height="300" />
                     : <div className="poster-fallback" aria-hidden="true" />}
                 </a>
                 )
