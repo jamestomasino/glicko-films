@@ -21,6 +21,14 @@
   --c-pill-bg: #effcf8;
   --c-pill-text: #0f5f59;
   --c-input-bg: #ffffff;
+  --c-button-primary-text: #ffffff;
+  --c-button-primary-border: #0f766e;
+  --c-button-primary-start: #14b8a6;
+  --c-button-primary-end: #0f766e;
+  --c-button-primary-hover-start: #16c2af;
+  --c-button-primary-hover-end: #0d6861;
+  --c-button-quiet-text: #0f172a;
+  --c-button-quiet-border: #bfd0e4;
   --c-quiet-bg: #ffffff;
   --c-quiet-hover: #f8fafc;
   --c-row-border: #e7eff8;
@@ -56,6 +64,14 @@
     --c-pill-bg: #0d2d30;
     --c-pill-text: #7ce7dc;
     --c-input-bg: #0a1324;
+    --c-button-primary-text: #eafffd;
+    --c-button-primary-border: #169b8e;
+    --c-button-primary-start: #0f8f84;
+    --c-button-primary-end: #0c6b63;
+    --c-button-primary-hover-start: #14a69a;
+    --c-button-primary-hover-end: #0e786f;
+    --c-button-quiet-text: #e2e8f0;
+    --c-button-quiet-border: #33455f;
     --c-quiet-bg: #0a1324;
     --c-quiet-hover: #0f1a30;
     --c-row-border: #1f2b3d;
@@ -94,6 +110,14 @@
   --c-pill-bg: #0d2d30;
   --c-pill-text: #7ce7dc;
   --c-input-bg: #0a1324;
+  --c-button-primary-text: #eafffd;
+  --c-button-primary-border: #169b8e;
+  --c-button-primary-start: #0f8f84;
+  --c-button-primary-end: #0c6b63;
+  --c-button-primary-hover-start: #14a69a;
+  --c-button-primary-hover-end: #0e786f;
+  --c-button-quiet-text: #e2e8f0;
+  --c-button-quiet-border: #33455f;
   --c-quiet-bg: #0a1324;
   --c-quiet-hover: #0f1a30;
   --c-row-border: #1f2b3d;
@@ -316,18 +340,18 @@ a:hover {
 }
 
 .c-button {
-  color: #ffffff;
-  border-color: #0f766e;
-  background: linear-gradient(180deg, #14b8a6, #0f766e);
+  color: var(--c-button-primary-text);
+  border-color: var(--c-button-primary-border);
+  background: linear-gradient(180deg, var(--c-button-primary-start), var(--c-button-primary-end));
 }
 
 .c-button:hover {
-  background: linear-gradient(180deg, #16c2af, #0d6861);
+  background: linear-gradient(180deg, var(--c-button-primary-hover-start), var(--c-button-primary-hover-end));
 }
 
 .c-button-quiet {
-  color: #0f172a;
-  border-color: var(--c-border-strong);
+  color: var(--c-button-quiet-text);
+  border-color: var(--c-button-quiet-border);
   background: var(--c-quiet-bg);
 }
 
