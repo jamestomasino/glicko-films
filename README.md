@@ -1,123 +1,95 @@
-# Tomasino Glicko-2 Film Rankings
+# Tomasino Film Rankings
 
-Personal film-ranking app that seeds initial ratings from TMDb and then evolves rankings through head-to-head results using Glicko-style updates.
+Personal movie-ranking app that uses head-to-head matchups and Elo/Glicko-style rating updates to keep a living leaderboard of films.
 
-## Current State
+## What It Does
 
-- Runtime: React (Vite) SPA + Netlify Functions
-- Database: Netlify Neon Postgres + Drizzle schema/migrations
-- Seed source: Trakt movie export (TV ignored) + incremental Trakt watched-movie sync
-- Image strategy: TMDb poster derivatives cached into Netlify Blobs (`thumb` and `cover`)
-- Homepage: ranked film list with infinite scroll (100 at a time), position, thumbnail, title, TMDb link
+- Publishes a public rankings page with infinite scroll.
+- Stores each film with TMDb metadata and cached poster images.
+- Lets you run private scoring tournaments to compare films head-to-head.
+- Updates film ratings over time based on matchup outcomes.
+- Provides a private admin area for intake, maintenance, and Trakt sync operations.
 
-## Completed
+## How Ranking Works
 
-- [x] Repo + Netlify project linkage
-- [x] Node 24 + npm migration
-- [x] Neon database setup via Netlify
-- [x] Drizzle schema and migrations in place
-- [x] Trakt movie seed import completed
-- [x] TMDb-based Elo/Glicko seed model applied to all films
-- [x] Poster thumbnail/cover caching in Netlify Blobs
-- [x] Public rankings homepage with infinite scroll
-- [x] Password-protected scoring workflow + tournament match entry
-- [x] Admin page for manual TMDb intake and film maintenance
-- [x] Scoring tournament setup dimensions: pairing + band size + Elo range
-- [x] Admin API endpoints for health, TMDb search, intake add, reseed, recache
-- [x] Basic API guardrails: auth checks, rate limiting on private routes, and error logging
-- [x] Lightweight API smoke test script
-- [x] Front-end rebuilt onto Catalyst-inspired React design system
-- [x] Trakt redirect OAuth + device OAuth support
-- [x] Queue-backed admin job runner (`admin_jobs`) for long-running sync tasks
-- [x] Incremental Trakt watched-movie sync worker with sync state tracking (`trakt_sync_state`)
-- [x] Alert webhook integration for critical Trakt/job failures
+1. Films are seeded with a starting Elo/Glicko rating derived from TMDb vote average and vote count.
+2. Scoring happens through tournaments with head-to-head matchups.
+3. You pick left, right, or draw.
+4. Ratings shift based on expected vs actual outcomes.
+5. Repeated tournaments continuously refine the leaderboard.
 
-## Backlog
+## Core Pages
 
-- [ ] Add scheduled/cron invocation for queued jobs (optional, currently manual/admin-triggered)
-- [ ] Add richer alert routing (Slack/email severity policies)
-- [ ] Add sync observability dashboard (throughput, duration, retry trend)
+- `/` Public ranked film list.
+- `/about` Project explanation.
+- `/score` Auth-protected scoring workflow.
+- `/admin` Auth-protected operations and integrations.
 
-## Trakt API Integration Plan
+## Integrations
 
-Docs:
+- **TMDb** for canonical movie metadata and poster paths.
+- **Trakt** for watched-movie history sync (movies only).
+- **Netlify Blobs** for persistent poster thumbnail/cover caching.
+- **Netlify Neon Postgres** for films, watch history, auth state, scoring state, and admin jobs.
 
-- https://trakt.docs.apiary.io/#introduction/
-- https://github.com/trakt/trakt-api
+## Runtime Architecture
 
-Base + headers:
+- Frontend: React + Vite SPA.
+- Backend: Netlify Functions (API and scheduled workers).
+- Database access: `@netlify/neon`.
+- Schema/migrations: Drizzle.
+- Scheduled processing: Netlify scheduled function for queued admin jobs.
 
-- Base URL: `https://api.trakt.tv`
-- Required headers on API requests:
-  - `trakt-api-version: 2`
-  - `trakt-api-key: <TRAKT_CLIENT_ID>`
-  - `Authorization: Bearer <access_token>` for user endpoints
+## Data + Jobs
 
-Auth strategy (recommended for this personal app):
+Main tables include:
 
-- Supported now:
-  - Redirect code flow (`/oauth/authorize` + `/oauth/token`)
-  - Device flow (`/oauth/device/code` + `/oauth/device/token`)
-- Persist `access_token`, `refresh_token`, `created_at`, `expires_in` for the single user.
-- Refresh tokens using `POST /oauth/token` before expiry.
+- `films`
+- `film_watch_events`
+- `score_tournaments`
+- `score_tournament_entries`
+- `score_matches`
+- `trakt_auth_state`
+- `trakt_sync_state`
+- `admin_jobs`
 
-Incremental sync strategy (movies only):
+The queue processes long-running admin work (for example Trakt sync) without blocking UI actions.
 
-- Pull from `GET /users/me/history/movies` with `start_at`, `page`, `limit`.
-- Treat history rows as watched events only (real plays), keyed by `trakt_history_id`.
-- Do not import from watchlist, collection, favorites, or ratings as watch activity.
-- Upsert new watch rows into `film_watch_events` using unique `trakt_history_id`.
-- Upsert/insert films by `tmdb_id` where possible, then run existing seed + image cache steps.
-- Ignore all TV endpoints (`shows`, `episodes`) in this project.
+## Authentication + Security
 
-Implementation shape:
+- Admin and scoring routes require the score session cookie.
+- Private write endpoints require explicit write intent headers.
+- Private endpoints are rate-limited.
 
-- Netlify functions:
-  - `admin-trakt-auth-begin` (redirect OAuth start)
-  - `admin-trakt-auth-callback` (redirect OAuth code exchange)
-  - `admin-trakt-auth-start` / `admin-trakt-auth-poll` (device flow)
-  - `admin-trakt-sync` (enqueue/run sync job)
-  - `admin-jobs` / `admin-jobs-run` (queue inspection and runner)
-- Job types:
-  - `trakt_sync` (incremental watched-movie importer)
-- Admin UI in `/admin` includes:
-  - Trakt connect controls
-  - Queue sync/run controls
-  - Recent job status list
-  - Last sync timestamp and result snapshot
+## Environment Variables
 
-Environment variables used by sync/jobs/alerts:
+Required/commonly used values:
 
+- `NETLIFY_DATABASE_URL`
+- `TMDB_API_ACCESS_TOKEN`
+- `SCORE_PASSWORD`
+- `SCORE_SESSION_SECRET`
 - `TRAKT_CLIENT_ID`
 - `TRAKT_CLIENT_SECRET`
 - `TRAKT_REDIRECT_URI`
-- `TRAKT_OAUTH_STATE_SECRET` (recommended; falls back to score session secret/password if unset)
-- `TRAKT_SYNC_MAX_PAGES` (optional, default `10`)
-- `TRAKT_SYNC_PAGE_SIZE` (optional, default `100`, max `100`)
-- `TRAKT_HTTP_USER_AGENT` (optional override for Trakt requests)
-- `ALERT_WEBHOOK_URL` (optional; receives JSON POST on critical failures)
 
-## Seeding Model
+Optional:
 
-Initial rating is derived from TMDb vote average and vote count:
+- `TRAKT_OAUTH_STATE_SECRET`
+- `TRAKT_SYNC_MAX_PAGES` (default `10`)
+- `TRAKT_SYNC_PAGE_SIZE` (default `100`, max `100`)
+- `TRAKT_HTTP_USER_AGENT`
+- `JOB_SCHEDULED_BATCH_LIMIT` (default `3`)
+- `ALERT_WEBHOOK_URL`
 
-1. `w = clamp(log10(vote_count + 1) / 3, 0, 1)`
-2. `adj = w * vote_average + (1 - w) * 6.5`
-3. `elo_seed = clamp(round(1500 + 120 * (adj - 6.5)), 1200, 1800)`
-4. `glicko_rating = elo_seed`
-5. `glicko_rd = clamp(220 - 80 * w, 140, 220)`
-6. `glicko_volatility = 0.06`
+## Scripts
 
-## Operational Scripts
-
-- `npm run db:generate`
-- `npm run db:migrate`
-- `npm run db:studio`
-- `npm run seed:elo`
-- `npm run cache:images`
-- `npm run smoke:api` (requires local or deployed base URL reachable via `SMOKE_BASE_URL`)
-
-For intake of a single new film, cache images immediately with one of:
-
-- `npm run cache:images -- --film-id <film_id> --force`
-- `npm run cache:images -- --tmdb-id <tmdb_id> --force`
+- `npm run dev` Start local frontend.
+- `npm run build` Build production frontend.
+- `npm run start` Preview built frontend.
+- `npm run db:generate` Generate Drizzle migration.
+- `npm run db:migrate` Apply migrations (via Netlify env context).
+- `npm run db:studio` Open Drizzle Studio.
+- `npm run seed:elo` Seed/reseed ratings from TMDb model.
+- `npm run cache:images` Cache posters to Netlify Blobs.
+- `npm run smoke:api` Run API smoke checks.
