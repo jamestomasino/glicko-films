@@ -27,8 +27,24 @@ exports.handler = async (event) => {
     const pairing = typeof body.pairing === 'string' ? body.pairing : 'swiss'
     const band = typeof body.band === 'string' ? body.band : 'normal'
     const range = typeof body.range === 'string' ? body.range : 'random'
+    const rdProfile = typeof body.rdProfile === 'string' ? body.rdProfile : 'balanced'
+    const poolGoal = typeof body.poolGoal === 'string' ? body.poolGoal : 'hybrid'
+    const freshnessBias = typeof body.freshnessBias === 'string' ? body.freshnessBias : 'mild'
+    const minUncertaintyShare = typeof body.minUncertaintyShare === 'string' ? body.minUncertaintyShare : 'quarter'
+    const matchBudget = typeof body.matchBudget === 'string' ? body.matchBudget : 'standard'
+    const upsetFocus = typeof body.upsetFocus === 'string' ? body.upsetFocus : 'off'
 
-    const state = await startTournament({ pairing, band, range })
+    const state = await startTournament({
+      pairing,
+      band,
+      range,
+      rdProfile,
+      poolGoal,
+      freshnessBias,
+      minUncertaintyShare,
+      matchBudget,
+      upsetFocus
+    })
     return jsonResponse(200, state)
   } catch (error) {
     console.error('score-start failed', { message: error.message })

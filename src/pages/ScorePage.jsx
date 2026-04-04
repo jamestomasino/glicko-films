@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { findOptionLabel, resolveStartValue, strategyLabel } from '../lib/score'
+import { useEffect, useState } from 'react'
+import { resolveStartValue, strategyLabel } from '../lib/score'
 
 export default function ScorePage() {
   const [authenticated, setAuthenticated] = useState(false)
@@ -8,6 +8,12 @@ export default function ScorePage() {
   const [startPairing, setStartPairing] = useState('swiss')
   const [startBand, setStartBand] = useState('normal')
   const [startRange, setStartRange] = useState('random')
+  const [startRdProfile, setStartRdProfile] = useState('balanced')
+  const [startPoolGoal, setStartPoolGoal] = useState('hybrid')
+  const [startFreshnessBias, setStartFreshnessBias] = useState('mild')
+  const [startMinUncertaintyShare, setStartMinUncertaintyShare] = useState('quarter')
+  const [startMatchBudget, setStartMatchBudget] = useState('standard')
+  const [startUpsetFocus, setStartUpsetFocus] = useState('off')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -72,6 +78,12 @@ export default function ScorePage() {
       setStartPairing((current) => resolveStartValue(payload?.startOptions?.pairing || [], current, defaults.pairing, 'swiss'))
       setStartBand((current) => resolveStartValue(payload?.startOptions?.band || [], current, defaults.band, 'normal'))
       setStartRange((current) => resolveStartValue(payload?.startOptions?.range || [], current, defaults.range, 'random'))
+      setStartRdProfile((current) => resolveStartValue(payload?.startOptions?.rdProfile || [], current, defaults.rdProfile, 'balanced'))
+      setStartPoolGoal((current) => resolveStartValue(payload?.startOptions?.poolGoal || [], current, defaults.poolGoal, 'hybrid'))
+      setStartFreshnessBias((current) => resolveStartValue(payload?.startOptions?.freshnessBias || [], current, defaults.freshnessBias, 'mild'))
+      setStartMinUncertaintyShare((current) => resolveStartValue(payload?.startOptions?.minUncertaintyShare || [], current, defaults.minUncertaintyShare, 'quarter'))
+      setStartMatchBudget((current) => resolveStartValue(payload?.startOptions?.matchBudget || [], current, defaults.matchBudget, 'standard'))
+      setStartUpsetFocus((current) => resolveStartValue(payload?.startOptions?.upsetFocus || [], current, defaults.upsetFocus, 'off'))
     } catch (err) {
       setError(err.message || 'Failed to load scoring state.')
     } finally {
@@ -114,7 +126,17 @@ export default function ScorePage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
-        body: JSON.stringify({ pairing: startPairing, band: startBand, range: startRange })
+        body: JSON.stringify({
+          pairing: startPairing,
+          band: startBand,
+          range: startRange,
+          rdProfile: startRdProfile,
+          poolGoal: startPoolGoal,
+          freshnessBias: startFreshnessBias,
+          minUncertaintyShare: startMinUncertaintyShare,
+          matchBudget: startMatchBudget,
+          upsetFocus: startUpsetFocus
+        })
       })
       if (!response.ok) {
         throw new Error('Failed to start tournament.')
@@ -139,15 +161,14 @@ export default function ScorePage() {
     setStartPairing('swiss')
     setStartBand('normal')
     setStartRange('random')
+    setStartRdProfile('balanced')
+    setStartPoolGoal('hybrid')
+    setStartFreshnessBias('mild')
+    setStartMinUncertaintyShare('quarter')
+    setStartMatchBudget('standard')
+    setStartUpsetFocus('off')
     window.dispatchEvent(new Event('score-auth-changed'))
   }
-
-  const selectedStartSummary = useMemo(() => {
-    const pairingLabel = findOptionLabel(state?.startOptions?.pairing || [], startPairing)
-    const bandLabel = findOptionLabel(state?.startOptions?.band || [], startBand)
-    const rangeLabel = findOptionLabel(state?.startOptions?.range || [], startRange)
-    return `${pairingLabel} · ${bandLabel} · ${rangeLabel}`
-  }, [state, startPairing, startBand, startRange])
 
   if (!authenticated) {
     return (
@@ -211,7 +232,7 @@ export default function ScorePage() {
             <section className="c-card start-panel">
               <div className="c-card-header"><h2>Start Tournament</h2></div>
               <div className="c-card-body">
-                <p className="c-page-subtitle">Choose pairing, band size, and Elo range.</p>
+                <p className="c-page-subtitle">Choose pairing, Elo sampling profile, and match pacing.</p>
                 <div className="mode-grid">
                   <div className="mode-group">
                     <h3>Pairing</h3>
@@ -225,7 +246,7 @@ export default function ScorePage() {
                   </div>
 
                   <div className="mode-group">
-                    <h3>Band Size</h3>
+                    <h3>Elo Band</h3>
                     {(state?.startOptions?.band || []).map((option) => (
                       <label key={option.id} className="mode-option">
                         <input type="radio" name="start-band" value={option.id} checked={startBand === option.id} onChange={() => setStartBand(option.id)} />
@@ -245,8 +266,74 @@ export default function ScorePage() {
                       </label>
                     ))}
                   </div>
+
+                  <div className="mode-group">
+                    <h3>RD Profile</h3>
+                    {(state?.startOptions?.rdProfile || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-rd-profile" value={option.id} checked={startRdProfile === option.id} onChange={() => setStartRdProfile(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mode-group">
+                    <h3>Pool Goal</h3>
+                    {(state?.startOptions?.poolGoal || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-pool-goal" value={option.id} checked={startPoolGoal === option.id} onChange={() => setStartPoolGoal(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mode-group">
+                    <h3>Freshness Bias</h3>
+                    {(state?.startOptions?.freshnessBias || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-freshness-bias" value={option.id} checked={startFreshnessBias === option.id} onChange={() => setStartFreshnessBias(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mode-group">
+                    <h3>RD Quota</h3>
+                    {(state?.startOptions?.minUncertaintyShare || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-rd-quota" value={option.id} checked={startMinUncertaintyShare === option.id} onChange={() => setStartMinUncertaintyShare(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mode-group">
+                    <h3>Match Budget</h3>
+                    {(state?.startOptions?.matchBudget || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-match-budget" value={option.id} checked={startMatchBudget === option.id} onChange={() => setStartMatchBudget(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="mode-group">
+                    <h3>Upset Focus</h3>
+                    {(state?.startOptions?.upsetFocus || []).map((option) => (
+                      <label key={option.id} className="mode-option">
+                        <input type="radio" name="start-upset-focus" value={option.id} checked={startUpsetFocus === option.id} onChange={() => setStartUpsetFocus(option.id)} />
+                        <span className="mode-title">{option.label}</span>
+                        <span className="mode-description">{option.description}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-                <button className="c-button" disabled={loading} onClick={startTournament}>Start {selectedStartSummary} Tournament</button>
+                <button className="c-button" disabled={loading} onClick={startTournament}>Begin Tournament</button>
               </div>
             </section>
             )}

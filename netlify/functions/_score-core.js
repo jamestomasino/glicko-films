@@ -58,11 +58,11 @@ async function getScoreState () {
   }
 }
 
-async function startTournament ({ mode, pairing, band, range } = {}) {
+async function startTournament ({ mode, pairing, band, range, rdProfile, poolGoal, freshnessBias, minUncertaintyShare, matchBudget, upsetFocus } = {}) {
   const sql = neon()
   const active = await getActiveTournament(sql)
   if (!active) {
-    await createTournament(sql, { mode, pairing, band, range })
+    await createTournament(sql, { mode, pairing, band, range, rdProfile, poolGoal, freshnessBias, minUncertaintyShare, matchBudget, upsetFocus })
   }
   return getScoreState()
 }
@@ -111,15 +111,30 @@ async function getActiveTournament (sql) {
   return rows[0] || null
 }
 
-async function createTournament (sql, { mode, pairing, band, range } = {}) {
+async function createTournament (sql, { mode, pairing, band, range, rdProfile, poolGoal, freshnessBias, minUncertaintyShare, matchBudget, upsetFocus } = {}) {
   const selectedBand = normalizeBand(band || mode)
   const selectedPairing = normalizePairing(pairing || mode)
   const selectedRange = normalizeRange(range)
+  const selectedRdProfile = normalizeRdProfile(rdProfile)
+  const selectedPoolGoal = normalizePoolGoal(poolGoal)
+  const selectedFreshnessBias = normalizeFreshnessBias(freshnessBias)
+  const selectedMinUncertaintyShare = normalizeMinUncertaintyShare(minUncertaintyShare)
+  const selectedMatchBudget = normalizeMatchBudget(matchBudget)
+  const selectedUpsetFocus = normalizeUpsetFocus(upsetFocus)
   const rdBias = parseFloatEnv('SCORE_RD_BIAS', 0.65, 0, 1)
+  const effectiveRdBias = rdBiasForProfile(rdBias, selectedRdProfile, selectedPoolGoal)
   const cooldownDays = parseIntEnv('SCORE_PAIR_COOLDOWN_DAYS', DEFAULT_COOLDOWN_DAYS, 1, 365)
+  const freshnessDays = parseIntEnv('SCORE_FILM_FRESHNESS_DAYS', Math.max(cooldownDays, 21), 1, 365)
   const basePoolSize = parseIntEnv('SCORE_TOURNAMENT_POOL_SIZE', DEFAULT_POOL_SIZE, 4, 24)
-  const widePoolSize = parseIntEnv('SCORE_WIDE_POOL_SIZE', Math.min(24, basePoolSize + 6), 4, 24)
-  const poolSize = selectedBand === 'wide' ? widePoolSize : basePoolSize
+  const widePoolSize = parseIntEnv('SCORE_WIDE_POOL_SIZE', Math.min(24, basePoolSize + 3), 4, 24)
+  const explorePoolSize = parseIntEnv('SCORE_EXPLORE_POOL_SIZE', Math.min(24, basePoolSize + 6), 4, 24)
+  let poolSize = selectedBand === 'explore'
+    ? explorePoolSize
+    : selectedBand === 'wide'
+      ? widePoolSize
+      : basePoolSize
+  if (selectedPoolGoal === 'stability') poolSize = Math.max(4, poolSize - 1)
+  if (selectedPoolGoal === 'discovery') poolSize = Math.min(24, poolSize + 1)
 
   const films = await sql.query(
     `select
@@ -137,25 +152,50 @@ async function createTournament (sql, { mode, pairing, band, range } = {}) {
   }
 
   const recentPairs = await loadRecentPairSet(sql, cooldownDays)
+  const recentFilms = await loadRecentFilmSet(sql, freshnessDays)
+  const freshnessPenalty = freshnessPenaltyForBias(selectedFreshnessBias)
   const rangeCandidates = selectRangeCandidates(films, selectedRange, poolSize)
   const sourceFilms = rangeCandidates.length >= 2 ? rangeCandidates : films
-  const selectedFilms = selectedBand === 'wide'
-    ? selectWideSpreadPool(sourceFilms, poolSize, recentPairs, rdBias)
-    : selectSimilarityPool(sourceFilms, poolSize, recentPairs, rdBias)
-  if (selectedFilms.length < 2) {
+  const selectorOptions = { freshnessPenalty, recentFilms, rdBias: effectiveRdBias }
+  const selectedFilms = selectedBand === 'explore'
+    ? selectExploreSpreadPool(sourceFilms, poolSize, recentPairs, selectorOptions)
+    : selectedBand === 'wide'
+      ? selectWideSpreadPool(sourceFilms, poolSize, recentPairs, selectorOptions)
+      : selectSimilarityPool(sourceFilms, poolSize, recentPairs, selectorOptions)
+  const rdThreshold = parseFloatEnv('SCORE_UNCERTAINTY_RD_THRESHOLD', 110, 40, 350)
+  const poolWithUncertainty = enforceMinUncertaintyShare(
+    selectedFilms,
+    sourceFilms,
+    recentPairs,
+    selectedMinUncertaintyShare,
+    rdThreshold
+  )
+  const filmById = new Map(sourceFilms.map((film) => [Number(film.id), film]))
+  const finalFilms = poolWithUncertainty.length >= 2 ? poolWithUncertainty : selectedFilms
+  if (finalFilms.length < 2) {
     throw new Error('Unable to build tournament pool.')
   }
 
-  const strategy = encodeStrategy({ pairing: selectedPairing, band: selectedBand, range: selectedRange })
+  const strategy = encodeStrategy({
+    pairing: selectedPairing,
+    band: selectedBand,
+    range: selectedRange,
+    rdProfile: selectedRdProfile,
+    poolGoal: selectedPoolGoal,
+    freshnessBias: selectedFreshnessBias,
+    minUncertaintyShare: selectedMinUncertaintyShare,
+    matchBudget: selectedMatchBudget,
+    upsetFocus: selectedUpsetFocus
+  })
 
   const [insertedTournament] = await sql.query(
     `insert into score_tournaments (status, strategy, pool_size, cooldown_days)
      values ('active', $1, $2, $3)
      returning *`,
-    [strategy, selectedFilms.length, cooldownDays]
+    [strategy, finalFilms.length, cooldownDays]
   )
 
-  for (const film of selectedFilms) {
+  for (const film of finalFilms) {
     await sql.query(
       `insert into score_tournament_entries (tournament_id, film_id, start_rating, start_rd, start_volatility)
        values ($1, $2, $3, $4, $5)`,
@@ -163,12 +203,14 @@ async function createTournament (sql, { mode, pairing, band, range } = {}) {
     )
   }
 
-  const swissRounds = parseIntEnv('SCORE_SWISS_ROUNDS', DEFAULT_SWISS_ROUNDS, 2, 12)
+  const configuredSwissRounds = parseIntEnv('SCORE_SWISS_ROUNDS', DEFAULT_SWISS_ROUNDS, 2, 12)
+  const swissRounds = swissRoundsForBudget(configuredSwissRounds, selectedMatchBudget, finalFilms.length)
   const pairRows = selectedPairing === 'swiss'
-    ? buildSwissPairRows(selectedFilms, recentPairs, swissRounds, insertedTournament.id)
-    : buildRoundRobinPairRows(selectedFilms, insertedTournament.id)
+    ? buildSwissPairRows(finalFilms, recentPairs, swissRounds, insertedTournament.id)
+    : buildRoundRobinPairRows(finalFilms, insertedTournament.id)
+  const budgetedPairRows = applyMatchBudget(pairRows, finalFilms, filmById, selectedMatchBudget, selectedUpsetFocus, selectedPairing)
 
-  for (const [tournamentId, lowId, highId] of pairRows) {
+  for (const [tournamentId, lowId, highId] of budgetedPairRows) {
     await sql.query(
       `insert into score_matches (tournament_id, film_low_id, film_high_id)
        values ($1, $2, $3)`,
@@ -328,7 +370,22 @@ async function loadRecentPairSet (sql, cooldownDays) {
   return set
 }
 
-function selectSimilarityPool (films, poolSize, recentPairs, rdBias = 0.65) {
+async function loadRecentFilmSet (sql, freshnessDays) {
+  const rows = await sql.query(
+    `select distinct unnest(array[film_low_id, film_high_id]) as film_id
+     from score_matches
+     where rated_at is not null
+       and rated_at >= now() - ($1::text || ' days')::interval`,
+    [String(freshnessDays)]
+  )
+  const set = new Set()
+  for (const row of rows) {
+    set.add(Number(row.film_id))
+  }
+  return set
+}
+
+function selectSimilarityPool (films, poolSize, recentPairs, { rdBias = 0.65, recentFilms = new Set(), freshnessPenalty = 0 } = {}) {
   const anchor = pickAnchorByRd(films, rdBias)
   const distances = films.map((film) => Math.abs(Number(film.rating) - Number(anchor.rating)))
   const maxDistance = Math.max(1, ...distances)
@@ -339,7 +396,8 @@ function selectSimilarityPool (films, poolSize, recentPairs, rdBias = 0.65) {
     .map((film) => {
       const distanceNorm = Math.abs(Number(film.rating) - Number(anchor.rating)) / maxDistance
       const rdNorm = clamp((Number(film.rd) || 0) / maxRd, 0, 1)
-      const score = distanceNorm + ((1 - rdNorm) * rdBias)
+      const freshnessNorm = recentFilms.has(Number(film.id)) ? freshnessPenalty : 0
+      const score = distanceNorm + ((1 - rdNorm) * rdBias) + freshnessNorm
       return {
         ...film,
         score,
@@ -378,9 +436,57 @@ function selectRangeCandidates (films, range, poolSize) {
   return sorted.slice(start, start + minCount)
 }
 
-function selectWideSpreadPool (films, poolSize, recentPairs, rdBias = 0.65) {
+function selectWideSpreadPool (films, poolSize, recentPairs, { rdBias = 0.65, recentFilms = new Set(), freshnessPenalty = 0 } = {}) {
+  const anchor = pickAnchorByRd(films, rdBias)
+  const distances = films.map((film) => Math.abs(Number(film.rating) - Number(anchor.rating)))
+  const maxDistance = Math.max(1, ...distances)
+  const rdValues = films.map((film) => Number(film.rd) || 0)
+  const maxRd = Math.max(1, ...rdValues)
+  const distanceWeight = 0.6
+  const rdWeight = Math.max(0.75, rdBias + 0.25)
+
+  const sorted = films
+    .map((film) => {
+      const distanceNorm = Math.abs(Number(film.rating) - Number(anchor.rating)) / maxDistance
+      const rdNorm = clamp((Number(film.rd) || 0) / maxRd, 0, 1)
+      const freshnessNorm = recentFilms.has(Number(film.id)) ? freshnessPenalty : 0
+      const score = (distanceNorm * distanceWeight) + ((1 - rdNorm) * rdWeight) + freshnessNorm
+      return {
+        ...film,
+        score,
+        distanceNorm,
+        rdNorm,
+        jitter: Math.random()
+      }
+    })
+    .sort((a, b) => (a.score - b.score) || (b.rdNorm - a.rdNorm) || (a.jitter - b.jitter))
+
+  const chosen = []
+  for (const candidate of sorted) {
+    const valid = chosen.every((existing) => !recentPairs.has(pairKey(candidate.id, existing.id)))
+    if (valid) chosen.push(candidate)
+    if (chosen.length >= poolSize) break
+  }
+
+  if (chosen.length < poolSize) {
+    const fallback = [...sorted].sort((a, b) => (b.rdNorm - a.rdNorm) || (a.distanceNorm - b.distanceNorm))
+    for (const candidate of fallback) {
+      if (chosen.some((film) => film.id === candidate.id)) continue
+      chosen.push(candidate)
+      if (chosen.length >= poolSize) break
+    }
+  }
+
+  return chosen
+}
+
+function selectExploreSpreadPool (films, poolSize, recentPairs, { rdBias = 0.65, recentFilms = new Set(), freshnessPenalty = 0 } = {}) {
   const sorted = [...films]
-    .map((film) => ({ ...film, jitter: Math.random() }))
+    .map((film) => ({
+      ...film,
+      freshnessPenalty: recentFilms.has(Number(film.id)) ? freshnessPenalty : 0,
+      jitter: Math.random()
+    }))
     .sort((a, b) => (Number(a.rating) - Number(b.rating)) || (a.jitter - b.jitter))
 
   const chosen = []
@@ -392,7 +498,7 @@ function selectWideSpreadPool (films, poolSize, recentPairs, rdBias = 0.65) {
     const candidates = [sorted[left], sorted[right]]
       .filter(Boolean)
       .filter((film) => !seen.has(film.id))
-      .sort((a, b) => ((Number(b.rd) - Number(a.rd)) * rdBias) || (Math.abs(Number(a.rating)) - Math.abs(Number(b.rating))))
+      .sort((a, b) => ((Number(b.rd) - Number(a.rd)) * Math.max(0.8, rdBias + 0.3)) || (a.freshnessPenalty - b.freshnessPenalty) || (a.jitter - b.jitter))
 
     for (const candidate of candidates) {
       const valid = chosen.every((existing) => !recentPairs.has(pairKey(candidate.id, existing.id)))
@@ -417,6 +523,60 @@ function selectWideSpreadPool (films, poolSize, recentPairs, rdBias = 0.65) {
   }
 
   return chosen
+}
+
+function enforceMinUncertaintyShare (selectedFilms, sourceFilms, recentPairs, minUncertaintyShare, rdThreshold) {
+  const targetShare = uncertaintyShareValue(minUncertaintyShare)
+  if (targetShare <= 0) return selectedFilms
+  const required = Math.max(1, Math.ceil(selectedFilms.length * targetShare))
+  const current = selectedFilms.filter((film) => Number(film.rd) >= rdThreshold).length
+  if (current >= required) return selectedFilms
+
+  const chosen = [...selectedFilms]
+  const chosenIds = new Set(chosen.map((film) => Number(film.id)))
+  const candidateHighRd = sourceFilms
+    .filter((film) => !chosenIds.has(Number(film.id)))
+    .filter((film) => Number(film.rd) >= rdThreshold)
+    .sort((a, b) => Number(b.rd) - Number(a.rd))
+
+  let highCount = current
+  for (const replacement of candidateHighRd) {
+    if (highCount >= required) break
+    const replaceIndex = chosen
+      .map((film, index) => ({ film, index }))
+      .filter(({ film }) => Number(film.rd) < rdThreshold)
+      .sort((a, b) => Number(a.film.rd) - Number(b.film.rd))
+      .find(({ index }) => {
+        const peers = chosen.filter((_, i) => i !== index)
+        return peers.every((peer) => !recentPairs.has(pairKey(replacement.id, peer.id)))
+      })
+    if (!replaceIndex) break
+    chosen[replaceIndex.index] = replacement
+    chosenIds.add(Number(replacement.id))
+    highCount += 1
+  }
+
+  return chosen
+}
+
+function applyMatchBudget (pairRows, films, filmById, matchBudget, upsetFocus, pairing) {
+  if (pairing !== 'swiss') return pairRows
+  const cap = matchCapForBudget(pairRows.length, films.length, matchBudget)
+  if (cap >= pairRows.length) return pairRows
+  if (upsetFocus !== 'on') return pairRows.slice(0, cap)
+
+  const scored = pairRows
+    .map((row, index) => {
+      const low = filmById.get(Number(row[1]))
+      const high = filmById.get(Number(row[2]))
+      const ratingGap = Math.abs((Number(low?.rating) || 0) - (Number(high?.rating) || 0))
+      const rdValue = (Number(low?.rd) || 0) + (Number(high?.rd) || 0)
+      const upsetScore = (1 / (1 + ratingGap)) + (rdValue / 600)
+      return { row, index, upsetScore }
+    })
+    .sort((a, b) => (b.upsetScore - a.upsetScore) || (a.index - b.index))
+
+  return scored.slice(0, cap).map((item) => item.row)
 }
 
 function buildRoundRobinPairRows (films, tournamentId) {
@@ -551,11 +711,12 @@ function pickAnchorByRd (films, rdBias = 0.65) {
 function normalizePairing (value) {
   if (value === 'swiss') return 'swiss'
   if (value === 'round_robin') return 'round_robin'
-  if (value === 'normal' || value === 'wide') return 'round_robin'
+  if (value === 'normal' || value === 'wide' || value === 'explore') return 'round_robin'
   return DEFAULT_PAIRING
 }
 
 function normalizeBand (value) {
+  if (value === 'explore') return 'explore'
   if (value === 'wide') return 'wide'
   if (value === 'normal') return 'normal'
   return DEFAULT_BAND
@@ -566,9 +727,81 @@ function normalizeRange (value) {
   return DEFAULT_RANGE
 }
 
-function encodeStrategy ({ pairing, band, range }) {
+function normalizeRdProfile (value) {
+  if (value === 'conservative' || value === 'aggressive') return value
+  return 'balanced'
+}
+
+function normalizePoolGoal (value) {
+  if (value === 'stability' || value === 'discovery') return value
+  return 'hybrid'
+}
+
+function normalizeFreshnessBias (value) {
+  if (value === 'mild' || value === 'strong') return value
+  return 'off'
+}
+
+function normalizeMinUncertaintyShare (value) {
+  if (value === 'quarter' || value === 'half') return value
+  return 'off'
+}
+
+function normalizeMatchBudget (value) {
+  if (value === 'quick' || value === 'deep') return value
+  return 'standard'
+}
+
+function normalizeUpsetFocus (value) {
+  if (value === 'on') return 'on'
+  return 'off'
+}
+
+function rdBiasForProfile (rdBias, rdProfile, poolGoal) {
+  const profileMultiplier = rdProfile === 'conservative'
+    ? 0.75
+    : rdProfile === 'aggressive'
+      ? 1.25
+      : 1
+  const goalMultiplier = poolGoal === 'stability'
+    ? 0.9
+    : poolGoal === 'discovery'
+      ? 1.1
+      : 1
+  return clamp(rdBias * profileMultiplier * goalMultiplier, 0, 1.6)
+}
+
+function freshnessPenaltyForBias (freshnessBias) {
+  if (freshnessBias === 'strong') return 0.25
+  if (freshnessBias === 'mild') return 0.12
+  return 0
+}
+
+function uncertaintyShareValue (minUncertaintyShare) {
+  if (minUncertaintyShare === 'half') return 0.5
+  if (minUncertaintyShare === 'quarter') return 0.25
+  return 0
+}
+
+function matchCapForBudget (totalPairs, filmCount, matchBudget) {
+  if (matchBudget === 'quick') return Math.max(6, Math.ceil(filmCount * 1.2))
+  return totalPairs
+}
+
+function swissRoundsForBudget (rounds, matchBudget, filmCount) {
+  const maxRounds = Math.max(2, filmCount - 1)
+  if (matchBudget === 'quick') return Math.max(2, rounds - 1)
+  if (matchBudget === 'deep') return Math.min(maxRounds, rounds + 2)
+  return rounds
+}
+
+function encodeStrategy ({ pairing, band, range, rdProfile, poolGoal, freshnessBias, minUncertaintyShare, matchBudget, upsetFocus }) {
   const pairingCode = pairing === 'swiss' ? 'sw' : 'rr'
-  const bandCode = band === 'wide' ? 'w' : 'n'
+  const bandCode = band === 'explore'
+    ? 'x'
+    : band === 'wide'
+      ? 'w'
+      : 'n'
   const rangeCode = range === 'high'
     ? 'h'
     : range === 'middle'
@@ -576,7 +809,13 @@ function encodeStrategy ({ pairing, band, range }) {
       : range === 'low'
         ? 'l'
         : 'r'
-  return `v2_${pairingCode}${bandCode}${rangeCode}`
+  const rdCode = rdProfile === 'conservative' ? 'c' : rdProfile === 'aggressive' ? 'a' : 'b'
+  const goalCode = poolGoal === 'stability' ? 's' : poolGoal === 'discovery' ? 'd' : 'h'
+  const freshnessCode = freshnessBias === 'mild' ? 'm' : freshnessBias === 'strong' ? 's' : 'n'
+  const uncertaintyCode = minUncertaintyShare === 'quarter' ? 'q' : minUncertaintyShare === 'half' ? 'h' : 'n'
+  const budgetCode = matchBudget === 'quick' ? 'q' : matchBudget === 'deep' ? 'd' : 's'
+  const upsetCode = upsetFocus === 'on' ? 'y' : 'n'
+  return `v3_${pairingCode}${bandCode}${rangeCode}_${rdCode}${goalCode}${freshnessCode}${uncertaintyCode}${budgetCode}${upsetCode}`
 }
 
 function availableStartOptions () {
@@ -584,21 +823,57 @@ function availableStartOptions () {
     defaults: {
       pairing: DEFAULT_PAIRING,
       band: DEFAULT_BAND,
-      range: DEFAULT_RANGE
+      range: DEFAULT_RANGE,
+      rdProfile: 'balanced',
+      poolGoal: 'hybrid',
+      freshnessBias: 'mild',
+      minUncertaintyShare: 'quarter',
+      matchBudget: 'standard',
+      upsetFocus: 'off'
     },
     pairing: [
       { id: 'round_robin', label: 'Full Pairing', description: 'Every film in the pool faces every other film.' },
       { id: 'swiss', label: 'Swiss Rules', description: 'Fewer seeded rounds, faster tournament completion.' }
     ],
     band: [
-      { id: 'normal', label: 'Normal Band', description: 'Standard rating spread.' },
-      { id: 'wide', label: 'Wide Band', description: 'Larger rating spread in each tournament pool.' }
+      { id: 'normal', label: 'Normal Band', description: 'Tighter Elo neighborhood around the anchor film.' },
+      { id: 'wide', label: 'Wide Band', description: 'Moderately broader Elo neighborhood with stronger RD weighting.' },
+      { id: 'explore', label: 'Explore Band', description: 'Most varied Elo sampling with highest RD-driven movement.' }
     ],
     range: [
       { id: 'random', label: 'Random Range', description: 'No Elo targeting; sample across the catalog.' },
       { id: 'high', label: 'High Range', description: 'Focus near higher Elo films.' },
       { id: 'middle', label: 'Middle Range', description: 'Focus around mid Elo films.' },
       { id: 'low', label: 'Low Range', description: 'Focus near lower Elo films.' }
+    ],
+    rdProfile: [
+      { id: 'conservative', label: 'Conservative RD', description: 'Less uncertainty weighting; steadier movement.' },
+      { id: 'balanced', label: 'Balanced RD', description: 'Default uncertainty weighting.' },
+      { id: 'aggressive', label: 'Aggressive RD', description: 'More uncertainty weighting; ratings move faster.' }
+    ],
+    poolGoal: [
+      { id: 'stability', label: 'Stability Goal', description: 'Slightly tighter pools and calmer adjustment.' },
+      { id: 'hybrid', label: 'Hybrid Goal', description: 'Balanced stability and discovery.' },
+      { id: 'discovery', label: 'Discovery Goal', description: 'Broader pools with stronger exploration pressure.' }
+    ],
+    freshnessBias: [
+      { id: 'off', label: 'No Freshness Bias', description: 'Allow recently seen films normally.' },
+      { id: 'mild', label: 'Mild Freshness Bias', description: 'Softly prefer films not seen recently.' },
+      { id: 'strong', label: 'Strong Freshness Bias', description: 'Strongly avoid films seen recently.' }
+    ],
+    minUncertaintyShare: [
+      { id: 'off', label: 'No RD Quota', description: 'No minimum high-RD share requirement.' },
+      { id: 'quarter', label: '25% RD Quota', description: 'At least a quarter of pool should be high RD.' },
+      { id: 'half', label: '50% RD Quota', description: 'At least half of pool should be high RD.' }
+    ],
+    matchBudget: [
+      { id: 'quick', label: 'Quick Budget', description: 'Smaller match count for faster completion.' },
+      { id: 'standard', label: 'Standard Budget', description: 'Balanced match count.' },
+      { id: 'deep', label: 'Deep Budget', description: 'Full match depth for maximum signal.' }
+    ],
+    upsetFocus: [
+      { id: 'off', label: 'Normal Pair Priority', description: 'Keep schedule ordering as generated.' },
+      { id: 'on', label: 'Upset Focus', description: 'Prioritize close, high-uncertainty pairings first.' }
     ]
   }
 }
