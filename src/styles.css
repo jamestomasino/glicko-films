@@ -504,6 +504,7 @@ a:hover {
 .poster {
   display: block;
   width: 100%;
+  height: auto;
   border-radius: 0.45rem;
   box-shadow: 0 10px 22px -14px rgba(15, 23, 42, 0.62);
 }
@@ -571,6 +572,14 @@ a:hover {
 }
 
 .film-stat-mobile-label {
+  display: none;
+}
+
+.film-stats {
+  display: contents;
+}
+
+.film-stat-value-mobile {
   display: none;
 }
 
@@ -914,12 +923,30 @@ a:hover {
     font-size: 0.73rem;
   }
 
+  .film-stat-value-desktop {
+    display: none;
+  }
+
+  .film-stat-value-mobile {
+    display: inline;
+  }
+
   .film-meta {
     display: block;
   }
 
-  .film-row .film-stat {
+  .film-stats {
     grid-column: 3;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 0.45rem;
+    margin-top: 0.08rem;
+  }
+
+  .film-stats .film-stat {
+    grid-column: 3;
+    margin-top: 0;
+    margin-right: 0;
   }
 
   .year {

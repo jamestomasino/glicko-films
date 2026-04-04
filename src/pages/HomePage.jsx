@@ -263,19 +263,22 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="film-stat">
-              <span className="film-stat-mobile-label">Elo</span>
-              <span className="film-stat-value">{film.elo}</span>
-            </div>
+            <div className="film-stats">
+              <div className="film-stat">
+                <span className="film-stat-mobile-label">Elo</span>
+                <span className="film-stat-value">{film.elo}</span>
+              </div>
 
-            <div className="film-stat">
-              <span className="film-stat-mobile-label">Confidence</span>
-              <span className={`film-stat-value ${confidenceClass(film.rd)}`}>{toConfidence(film.rd)}% (RD {displayRd(film.rd)})</span>
-            </div>
+              <div className="film-stat">
+                <span className="film-stat-mobile-label">Confidence</span>
+                <span className={`film-stat-value film-stat-value-desktop ${confidenceClass(film.rd)}`}>{toConfidence(film.rd)}% (RD {displayRd(film.rd)})</span>
+                <span className={`film-stat-value film-stat-value-mobile ${confidenceClass(film.rd)}`}>{toConfidence(film.rd)}%</span>
+              </div>
 
-            <div className="film-stat">
-              <span className="film-stat-mobile-label">Matches</span>
-              <span className="film-stat-value">{film.matches || 0}</span>
+              <div className="film-stat">
+                <span className="film-stat-mobile-label">Matches</span>
+                <span className="film-stat-value">{film.matches || 0}</span>
+              </div>
             </div>
           </li>
         ))}
