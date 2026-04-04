@@ -38,58 +38,50 @@ exports.handler = async (event) => {
       return jsonResponse(404, { error: 'Film not found.' })
     }
 
-    await sql.query('begin')
-    try {
-      const deletedMatches = await sql.query(
-        `delete from score_matches
-         where film_low_id = $1 or film_high_id = $1
-         returning id`,
-        [film.id]
-      )
+    const deletedMatches = await sql.query(
+      `delete from score_matches
+       where film_low_id = $1 or film_high_id = $1
+       returning id`,
+      [film.id]
+    )
 
-      await sql.query(
-        `update score_tournament_entries e
-         set
-           start_rating = $1,
-           start_rd = $2,
-           start_volatility = $3
-         from score_tournaments t
-         where
-           e.tournament_id = t.id
-           and t.status = 'active'
-           and e.film_id = $4`,
-        [manualElo, RESET_RD, RESET_VOLATILITY, film.id]
-      )
+    await sql.query(
+      `update score_tournament_entries e
+       set
+         start_rating = $1,
+         start_rd = $2,
+         start_volatility = $3
+       from score_tournaments t
+       where
+         e.tournament_id = t.id
+         and t.status = 'active'
+         and e.film_id = $4`,
+      [manualElo, RESET_RD, RESET_VOLATILITY, film.id]
+    )
 
-      await sql.query(
-        `update films
-         set
-           elo_seed = $1,
-           glicko_rating = $1,
-           glicko_rd = $2,
-           glicko_volatility = $3,
-           seed_model = 'manual_admin_v1',
-           seeded_at = now(),
-           updated_at = now()
-         where id = $4`,
-        [manualElo, RESET_RD, RESET_VOLATILITY, film.id]
-      )
+    await sql.query(
+      `update films
+       set
+         elo_seed = $1,
+         glicko_rating = $1,
+         glicko_rd = $2,
+         glicko_volatility = $3,
+         seed_model = 'manual_admin_v1',
+         seeded_at = now(),
+         updated_at = now()
+       where id = $4`,
+      [manualElo, RESET_RD, RESET_VOLATILITY, film.id]
+    )
 
-      await sql.query('commit')
+    const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
+    console.info('admin-set-elo success', { filmId: film.id, tmdbId: film.tmdb_id || null, elo: manualElo, deletedMatches: deletedMatches.length })
 
-      const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
-      console.info('admin-set-elo success', { filmId: film.id, tmdbId: film.tmdb_id || null, elo: manualElo, deletedMatches: deletedMatches.length })
-
-      return jsonResponse(200, {
-        ok: true,
-        film: formatFilm(updated),
-        elo: manualElo,
-        deletedMatchCount: deletedMatches.length
-      })
-    } catch (error) {
-      await sql.query('rollback')
-      throw error
-    }
+    return jsonResponse(200, {
+      ok: true,
+      film: formatFilm(updated),
+      elo: manualElo,
+      deletedMatchCount: deletedMatches.length
+    })
   } catch (error) {
     console.error('admin-set-elo failed', { message: error.message })
     return jsonResponse(500, { error: 'Failed to set Elo.', detail: error.message })
