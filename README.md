@@ -6,7 +6,7 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 
 - Runtime: React (Vite) SPA + Netlify Functions
 - Database: Netlify Neon Postgres + Drizzle schema/migrations
-- Seed source: Trakt movie export (TV ignored), with Trakt API sync planned
+- Seed source: Trakt movie export (TV ignored) + incremental Trakt watched-movie sync
 - Image strategy: TMDb poster derivatives cached into Netlify Blobs (`thumb` and `cover`)
 - Homepage: ranked film list with infinite scroll (100 at a time), position, thumbnail, title, TMDb link
 
@@ -27,12 +27,16 @@ Personal film-ranking app that seeds initial ratings from TMDb and then evolves 
 - [x] Basic API guardrails: auth checks, rate limiting on private routes, and error logging
 - [x] Lightweight API smoke test script
 - [x] Front-end rebuilt onto Catalyst-inspired React design system
+- [x] Trakt redirect OAuth + device OAuth support
+- [x] Queue-backed admin job runner (`admin_jobs`) for long-running sync tasks
+- [x] Incremental Trakt watched-movie sync worker with sync state tracking (`trakt_sync_state`)
+- [x] Alert webhook integration for critical Trakt/job failures
 
 ## Backlog
 
-- [ ] Add Trakt API auth + incremental re-sync (movies only)
-- [ ] Add optional job queueing for long-running admin tasks
-- [ ] Add alerting integration for production function errors
+- [ ] Add scheduled/cron invocation for queued jobs (optional, currently manual/admin-triggered)
+- [ ] Add richer alert routing (Slack/email severity policies)
+- [ ] Add sync observability dashboard (throughput, duration, retry trend)
 
 ## Trakt API Integration Plan
 
@@ -51,15 +55,15 @@ Base + headers:
 
 Auth strategy (recommended for this personal app):
 
-- Use device flow:
-  - `POST /oauth/device/code`
-  - `POST /oauth/device/token`
+- Supported now:
+  - Redirect code flow (`/oauth/authorize` + `/oauth/token`)
+  - Device flow (`/oauth/device/code` + `/oauth/device/token`)
 - Persist `access_token`, `refresh_token`, `created_at`, `expires_in` for the single user.
 - Refresh tokens using `POST /oauth/token` before expiry.
 
 Incremental sync strategy (movies only):
 
-- Pull from `GET /users/me/history/movies` with `start_at`, `end_at`, `page`, `limit`.
+- Pull from `GET /users/me/history/movies` with `start_at`, `page`, `limit`.
 - Treat history rows as watched events only (real plays), keyed by `trakt_history_id`.
 - Do not import from watchlist, collection, favorites, or ratings as watch activity.
 - Upsert new watch rows into `film_watch_events` using unique `trakt_history_id`.
@@ -68,14 +72,30 @@ Incremental sync strategy (movies only):
 
 Implementation shape:
 
-- New Netlify function(s):
-  - `admin-trakt-auth-start` (device code)
-  - `admin-trakt-auth-poll` (poll token)
-  - `admin-trakt-sync` (incremental history sync)
-- New admin UI section in `/admin`:
-  - Connect Trakt
-  - Run sync now
-  - Show last synced timestamp + counts
+- Netlify functions:
+  - `admin-trakt-auth-begin` (redirect OAuth start)
+  - `admin-trakt-auth-callback` (redirect OAuth code exchange)
+  - `admin-trakt-auth-start` / `admin-trakt-auth-poll` (device flow)
+  - `admin-trakt-sync` (enqueue/run sync job)
+  - `admin-jobs` / `admin-jobs-run` (queue inspection and runner)
+- Job types:
+  - `trakt_sync` (incremental watched-movie importer)
+- Admin UI in `/admin` includes:
+  - Trakt connect controls
+  - Queue sync/run controls
+  - Recent job status list
+  - Last sync timestamp and result snapshot
+
+Environment variables used by sync/jobs/alerts:
+
+- `TRAKT_CLIENT_ID`
+- `TRAKT_CLIENT_SECRET`
+- `TRAKT_REDIRECT_URI`
+- `TRAKT_OAUTH_STATE_SECRET` (recommended; falls back to score session secret/password if unset)
+- `TRAKT_SYNC_MAX_PAGES` (optional, default `10`)
+- `TRAKT_SYNC_PAGE_SIZE` (optional, default `100`, max `100`)
+- `TRAKT_HTTP_USER_AGENT` (optional override for Trakt requests)
+- `ALERT_WEBHOOK_URL` (optional; receives JSON POST on critical failures)
 
 ## Seeding Model
 
