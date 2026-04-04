@@ -691,6 +691,12 @@ a:hover {
   color: var(--c-text-soft);
 }
 
+.start-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .inline-form {
   display: flex;
   flex-wrap: wrap;
@@ -776,6 +782,10 @@ a:hover {
 @media (max-width: 900px) {
   .mode-grid {
     grid-template-columns: 1fr;
+  }
+
+  .start-actions {
+    flex-direction: column;
   }
 
   .battle-grid {

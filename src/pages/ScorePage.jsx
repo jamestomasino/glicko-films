@@ -149,6 +149,19 @@ export default function ScorePage() {
     }
   }
 
+  function resetTournamentSettings() {
+    const defaults = state?.startOptions?.defaults || {}
+    setStartPairing(resolveStartValue(state?.startOptions?.pairing || [], '', defaults.pairing, 'swiss'))
+    setStartBand(resolveStartValue(state?.startOptions?.band || [], '', defaults.band, 'normal'))
+    setStartRange(resolveStartValue(state?.startOptions?.range || [], '', defaults.range, 'random'))
+    setStartRdProfile(resolveStartValue(state?.startOptions?.rdProfile || [], '', defaults.rdProfile, 'balanced'))
+    setStartPoolGoal(resolveStartValue(state?.startOptions?.poolGoal || [], '', defaults.poolGoal, 'hybrid'))
+    setStartFreshnessBias(resolveStartValue(state?.startOptions?.freshnessBias || [], '', defaults.freshnessBias, 'mild'))
+    setStartMinUncertaintyShare(resolveStartValue(state?.startOptions?.minUncertaintyShare || [], '', defaults.minUncertaintyShare, 'quarter'))
+    setStartMatchBudget(resolveStartValue(state?.startOptions?.matchBudget || [], '', defaults.matchBudget, 'standard'))
+    setStartUpsetFocus(resolveStartValue(state?.startOptions?.upsetFocus || [], '', defaults.upsetFocus, 'off'))
+  }
+
   async function logout() {
     await fetch('/api/score/logout', {
       method: 'POST',
@@ -333,7 +346,10 @@ export default function ScorePage() {
                     ))}
                   </div>
                 </div>
-                <button className="c-button" disabled={loading} onClick={startTournament}>Begin Tournament</button>
+                <div className="start-actions">
+                  <button className="c-button" disabled={loading} onClick={startTournament}>Begin Tournament</button>
+                  <button className="c-button-quiet" disabled={loading} onClick={resetTournamentSettings}>Reset to Defaults</button>
+                </div>
               </div>
             </section>
             )}
