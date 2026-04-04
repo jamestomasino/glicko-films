@@ -1,6 +1,7 @@
 const { requireAdmin } = require('./_admin-guard')
 const { buildAuthorizeUrl, getTraktConfig } = require('./_trakt-core')
 const { createStateCookie } = require('./_trakt-oauth-state')
+const { reportError } = require('./_alerts')
 
 exports.handler = async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 20, windowMs: 60_000 })
@@ -24,7 +25,7 @@ exports.handler = async (event) => {
       })
     }
   } catch (error) {
-    console.error('admin-trakt-auth-begin failed', { message: error.message })
+    await reportError({ source: 'admin-trakt-auth-begin', error })
     return jsonResponse(500, { error: 'Failed to begin Trakt OAuth.', detail: error.message })
   }
 }

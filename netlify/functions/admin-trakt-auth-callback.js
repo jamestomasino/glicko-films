@@ -2,6 +2,7 @@ const { neon } = require('@netlify/neon')
 const { requireAdmin } = require('./_admin-guard')
 const { exchangeAuthorizationCode, saveAuthState, tokenExpiryAtIso } = require('./_trakt-core')
 const { clearStateCookie, readStateCookie } = require('./_trakt-oauth-state')
+const { reportError } = require('./_alerts')
 
 exports.handler = async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 30, windowMs: 60_000 })
@@ -31,7 +32,7 @@ exports.handler = async (event) => {
       expiresAt: tokenExpiryAtIso(authState)
     }, clearStateCookie())
   } catch (error) {
-    console.error('admin-trakt-auth-callback failed', { message: error.message })
+    await reportError({ source: 'admin-trakt-auth-callback', error })
     return response(500, { error: 'Failed to complete Trakt OAuth callback.', detail: error.message }, clearStateCookie())
   }
 }

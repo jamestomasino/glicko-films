@@ -1,5 +1,6 @@
 import {
   bigint,
+  jsonb,
   date,
   integer,
   pgTable,
@@ -98,5 +99,31 @@ export const traktAuthState = pgTable('trakt_auth_state', {
   createdAtEpoch: integer('created_at_epoch'),
   expiresIn: integer('expires_in'),
   connectedAt: timestamp('connected_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})
+
+export const traktSyncState = pgTable('trakt_sync_state', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  key: varchar({ length: 32 }).notNull().default('primary').unique(),
+  lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
+  lastHistoryId: bigint('last_history_id', { mode: 'number' }),
+  lastJobId: integer('last_job_id'),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+  lastResult: jsonb('last_result'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
+})
+
+export const adminJobs = pgTable('admin_jobs', {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  type: varchar({ length: 64 }).notNull(),
+  status: varchar({ length: 24 }).notNull().default('queued'),
+  payload: jsonb().notNull().default({}),
+  result: jsonb(),
+  error: text(),
+  attempts: integer().notNull().default(0),
+  runAfter: timestamp('run_after', { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 })

@@ -8,6 +8,7 @@ export default function AdminPage() {
   const [success, setSuccess] = useState('')
   const [health, setHealth] = useState(null)
   const [traktStatus, setTraktStatus] = useState(null)
+  const [jobs, setJobs] = useState([])
   const [deviceAuth, setDeviceAuth] = useState({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -29,6 +30,7 @@ export default function AdminPage() {
     if (session) {
       await loadHealth()
       await loadTraktStatus()
+      await loadJobs()
     }
   }
 
@@ -79,6 +81,7 @@ export default function AdminPage() {
     setAuthenticated(false)
     setHealth(null)
     setTraktStatus(null)
+    setJobs([])
     setDeviceAuth({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
     setSearchResults([])
     window.dispatchEvent(new Event('score-auth-changed'))
@@ -99,6 +102,15 @@ export default function AdminPage() {
       const payload = await response.json()
       if (!response.ok) throw new Error(payload.error || 'Failed to load Trakt status.')
       setTraktStatus(payload)
+    })
+  }
+
+  async function loadJobs() {
+    await runAction(async () => {
+      const response = await fetch('/api/admin/jobs?limit=20', { credentials: 'include' })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Failed to load jobs.')
+      setJobs(Array.isArray(payload.jobs) ? payload.jobs : [])
     })
   }
 
@@ -151,6 +163,41 @@ export default function AdminPage() {
       }
       setSuccess('Trakt connected successfully.')
       await loadTraktStatus()
+    })
+  }
+
+  async function queueTraktSync(runNow = false) {
+    await runAction(async () => {
+      const response = await fetch('/api/admin/trakt-sync', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
+        body: JSON.stringify({ runNow })
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Failed to queue Trakt sync.')
+      const processed = Array.isArray(payload.processed) ? payload.processed.length : 0
+      setSuccess(runNow
+        ? `Trakt sync queued and processed (${processed} job(s) run).`
+        : `Trakt sync queued as job #${payload.job?.id || '?'}.`)
+      await loadTraktStatus()
+      await loadJobs()
+    })
+  }
+
+  async function runQueuedJobs(limit = 1) {
+    await runAction(async () => {
+      const response = await fetch('/api/admin/jobs-run', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json', 'x-film-write-intent': '1' },
+        body: JSON.stringify({ limit })
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.error || 'Failed to run jobs.')
+      setSuccess(`Ran ${payload.processedCount || 0} queued job(s).`)
+      await loadTraktStatus()
+      await loadJobs()
     })
   }
 
@@ -277,7 +324,7 @@ export default function AdminPage() {
       <section className="c-card admin-card">
         <div className="c-card-header">
           <h2>Trakt Connection</h2>
-          <button className="c-button-quiet" disabled={loading} onClick={loadTraktStatus}>Refresh</button>
+          <button className="c-button-quiet" disabled={loading} onClick={async () => { await loadTraktStatus(); await loadJobs() }}>Refresh</button>
         </div>
         <div className="c-card-body">
           {traktStatus
@@ -292,6 +339,39 @@ export default function AdminPage() {
           {deviceAuth.userCode
             ? <p>Enter code <code>{deviceAuth.userCode}</code> at <a href={deviceAuth.verificationUrlComplete} target="_blank" rel="noopener noreferrer">{deviceAuth.verificationUrlComplete}</a></p>
             : null}
+        </div>
+      </section>
+
+      <section className="c-card admin-card">
+        <div className="c-card-header">
+          <h2>Trakt Sync Jobs</h2>
+          <button className="c-button-quiet" disabled={loading} onClick={loadJobs}>Refresh Jobs</button>
+        </div>
+        <div className="c-card-body">
+          <p>
+            Last sync: <strong>{traktStatus?.sync?.lastSyncedAt || 'never'}</strong>
+            {traktStatus?.sync?.pendingJobs ? ` · pending jobs ${traktStatus.sync.pendingJobs}` : ''}
+          </p>
+          <div className="inline-form">
+            <button className="c-button" disabled={loading} onClick={() => queueTraktSync(false)}>Queue Sync</button>
+            <button className="c-button-quiet" disabled={loading} onClick={() => queueTraktSync(true)}>Run Sync Now</button>
+            <button className="c-button-quiet" disabled={loading} onClick={() => runQueuedJobs(1)}>Run 1 Queued Job</button>
+          </div>
+          {jobs.length
+            ? (
+              <ul className="results">
+                {jobs.map((job) => (
+                  <li key={job.id} className="result-row">
+                    <div className="meta">
+                      <strong>#{job.id}</strong> · <span>{job.type}</span> · <span>{job.status}</span>
+                      <small>updated {job.updated_at || job.updatedAt || 'unknown'}</small>
+                      {job.error ? <small>{job.error}</small> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              )
+            : <p className="c-page-subtitle">No jobs yet.</p>}
         </div>
       </section>
 

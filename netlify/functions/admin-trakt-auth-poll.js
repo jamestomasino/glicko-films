@@ -1,6 +1,7 @@
 const { neon } = require('@netlify/neon')
 const { requireAdmin } = require('./_admin-guard')
 const { pollDeviceToken, saveAuthState, tokenExpiryAtIso } = require('./_trakt-core')
+const { reportError } = require('./_alerts')
 
 exports.handler = async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 120, windowMs: 60_000 })
@@ -28,7 +29,7 @@ exports.handler = async (event) => {
       expiresAt: tokenExpiryAtIso(state)
     })
   } catch (error) {
-    console.error('admin-trakt-auth-poll failed', { message: error.message })
+    await reportError({ source: 'admin-trakt-auth-poll', error })
     return jsonResponse(500, { error: 'Failed to poll Trakt auth.', detail: error.message })
   }
 }
