@@ -62,10 +62,10 @@ exports.handler = async (event) => {
     await sql.query(
       `update films
        set
-         elo_seed = $1,
-         glicko_rating = $1,
-         glicko_rd = $2,
-         glicko_volatility = $3,
+         elo_seed = $1::int,
+         glicko_rating = $1::real,
+         glicko_rd = $2::real,
+         glicko_volatility = $3::real,
          seed_model = 'manual_admin_v1',
          seeded_at = now(),
          updated_at = now()
