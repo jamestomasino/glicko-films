@@ -115,6 +115,7 @@ async function createTournament (sql, { mode, pairing, band, range } = {}) {
   const selectedBand = normalizeBand(band || mode)
   const selectedPairing = normalizePairing(pairing || mode)
   const selectedRange = normalizeRange(range)
+  const rdBias = parseFloatEnv('SCORE_RD_BIAS', 0.65, 0, 1)
   const cooldownDays = parseIntEnv('SCORE_PAIR_COOLDOWN_DAYS', DEFAULT_COOLDOWN_DAYS, 1, 365)
   const basePoolSize = parseIntEnv('SCORE_TOURNAMENT_POOL_SIZE', DEFAULT_POOL_SIZE, 4, 24)
   const widePoolSize = parseIntEnv('SCORE_WIDE_POOL_SIZE', Math.min(24, basePoolSize + 6), 4, 24)
@@ -139,8 +140,8 @@ async function createTournament (sql, { mode, pairing, band, range } = {}) {
   const rangeCandidates = selectRangeCandidates(films, selectedRange, poolSize)
   const sourceFilms = rangeCandidates.length >= 2 ? rangeCandidates : films
   const selectedFilms = selectedBand === 'wide'
-    ? selectWideSpreadPool(sourceFilms, poolSize, recentPairs)
-    : selectSimilarityPool(sourceFilms, poolSize, recentPairs)
+    ? selectWideSpreadPool(sourceFilms, poolSize, recentPairs, rdBias)
+    : selectSimilarityPool(sourceFilms, poolSize, recentPairs, rdBias)
   if (selectedFilms.length < 2) {
     throw new Error('Unable to build tournament pool.')
   }
@@ -327,15 +328,26 @@ async function loadRecentPairSet (sql, cooldownDays) {
   return set
 }
 
-function selectSimilarityPool (films, poolSize, recentPairs) {
-  const anchor = films[Math.floor(Math.random() * films.length)]
+function selectSimilarityPool (films, poolSize, recentPairs, rdBias = 0.65) {
+  const anchor = pickAnchorByRd(films, rdBias)
+  const distances = films.map((film) => Math.abs(Number(film.rating) - Number(anchor.rating)))
+  const maxDistance = Math.max(1, ...distances)
+  const rdValues = films.map((film) => Number(film.rd) || 0)
+  const maxRd = Math.max(1, ...rdValues)
+
   const sorted = films
-    .map((film) => ({
-      ...film,
-      distance: Math.abs(Number(film.rating) - Number(anchor.rating)),
-      jitter: Math.random()
-    }))
-    .sort((a, b) => (a.distance - b.distance) || (a.jitter - b.jitter))
+    .map((film) => {
+      const distanceNorm = Math.abs(Number(film.rating) - Number(anchor.rating)) / maxDistance
+      const rdNorm = clamp((Number(film.rd) || 0) / maxRd, 0, 1)
+      const score = distanceNorm + ((1 - rdNorm) * rdBias)
+      return {
+        ...film,
+        score,
+        rdNorm,
+        jitter: Math.random()
+      }
+    })
+    .sort((a, b) => (a.score - b.score) || (b.rdNorm - a.rdNorm) || (a.jitter - b.jitter))
 
   const chosen = []
   for (const candidate of sorted) {
@@ -345,7 +357,8 @@ function selectSimilarityPool (films, poolSize, recentPairs) {
   }
 
   if (chosen.length < poolSize) {
-    for (const candidate of sorted) {
+    const fallback = [...sorted].sort((a, b) => (b.rdNorm - a.rdNorm) || (a.score - b.score))
+    for (const candidate of fallback) {
       if (chosen.some((film) => film.id === candidate.id)) continue
       chosen.push(candidate)
       if (chosen.length >= poolSize) break
@@ -365,7 +378,7 @@ function selectRangeCandidates (films, range, poolSize) {
   return sorted.slice(start, start + minCount)
 }
 
-function selectWideSpreadPool (films, poolSize, recentPairs) {
+function selectWideSpreadPool (films, poolSize, recentPairs, rdBias = 0.65) {
   const sorted = [...films]
     .map((film) => ({ ...film, jitter: Math.random() }))
     .sort((a, b) => (Number(a.rating) - Number(b.rating)) || (a.jitter - b.jitter))
@@ -379,6 +392,7 @@ function selectWideSpreadPool (films, poolSize, recentPairs) {
     const candidates = [sorted[left], sorted[right]]
       .filter(Boolean)
       .filter((film) => !seen.has(film.id))
+      .sort((a, b) => ((Number(b.rd) - Number(a.rd)) * rdBias) || (Math.abs(Number(a.rating)) - Math.abs(Number(b.rating))))
 
     for (const candidate of candidates) {
       const valid = chosen.every((existing) => !recentPairs.has(pairKey(candidate.id, existing.id)))
@@ -393,7 +407,8 @@ function selectWideSpreadPool (films, poolSize, recentPairs) {
   }
 
   if (chosen.length < poolSize) {
-    for (const candidate of sorted) {
+    const fallback = [...sorted].sort((a, b) => Number(b.rd) - Number(a.rd))
+    for (const candidate of fallback) {
       if (seen.has(candidate.id)) continue
       chosen.push(candidate)
       seen.add(candidate.id)
@@ -496,6 +511,10 @@ function pairKey (a, b) {
   return `${low}:${high}`
 }
 
+function clamp (value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
 function outcomeToScoreLow (outcome) {
   if (outcome === 'left') return 1
   if (outcome === 'draw') return 0.5
@@ -507,6 +526,26 @@ function parseIntEnv (name, fallback, min, max) {
   const parsed = Number.parseInt(process.env[name] || '', 10)
   if (Number.isNaN(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
+}
+
+function parseFloatEnv (name, fallback, min, max) {
+  const parsed = Number.parseFloat(process.env[name] || '')
+  if (Number.isNaN(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
+function pickAnchorByRd (films, rdBias = 0.65) {
+  if (films.length === 0) return null
+  if (rdBias <= 0) return films[Math.floor(Math.random() * films.length)]
+
+  const weights = films.map((film) => 1 + ((Number(film.rd) || 0) * rdBias))
+  const total = weights.reduce((sum, value) => sum + value, 0)
+  let target = Math.random() * total
+  for (let i = 0; i < films.length; i += 1) {
+    target -= weights[i]
+    if (target <= 0) return films[i]
+  }
+  return films[films.length - 1]
 }
 
 function normalizePairing (value) {
