@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 export default function HomePage() {
   const [films, setFilms] = useState([])
@@ -62,11 +63,11 @@ export default function HomePage() {
   return (
     <div className="c-shell rankings-page">
       <header className="c-page-header">
-        <div className="header-row">
+        <div className="home-header-top">
           <h1>Tomasino Film Rankings</h1>
-          <span className="c-pill">Live Elo Board</span>
+          <Link className="about-link" to="/about">About</Link>
         </div>
-        <p className="c-page-subtitle">Ordered by current rating. Showing {films.length} of {total || '...'} films.</p>
+        <p className="c-page-subtitle">Showing {films.length} of {total || '...'} films.</p>
       </header>
 
       <ol className="film-list c-card">

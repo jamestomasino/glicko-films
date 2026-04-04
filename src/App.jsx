@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage'
 import ScorePage from './pages/ScorePage'
 import AdminPage from './pages/AdminPage'
 import TraktCallbackPage from './pages/TraktCallbackPage'
+import AboutPage from './pages/AboutPage'
 
 function AppNav({ hasSession }) {
   const location = useLocation()
@@ -55,6 +56,7 @@ export default function App() {
           <Route path="/score" element={<ScorePage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/trakt/callback" element={<TraktCallbackPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="*" element={<div className="c-shell"><div className="c-card c-card-body"><h1>Not Found</h1><p><Link to="/">Go back home</Link></p></div></div>} />
         </Routes>
       </main>

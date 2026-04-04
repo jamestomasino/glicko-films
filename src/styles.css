@@ -378,9 +378,31 @@ a:hover {
 .rankings-page,
 .score-page,
 .admin-page,
-.callback-page {
+.callback-page,
+.about-page {
   display: grid;
   gap: 1rem;
+}
+
+.rankings-page .c-page-header {
+  display: block;
+}
+
+.home-header-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.about-link {
+  font-size: 0.78rem;
+  color: var(--c-text-soft);
+  text-decoration: none;
+}
+
+.about-link:hover {
+  color: var(--c-link);
 }
 
 .header-row {
@@ -673,6 +695,20 @@ a:hover {
 
 .callback-card {
   max-width: 42rem;
+}
+
+.about-card {
+  max-width: 52rem;
+}
+
+.about-body {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.about-body h2 {
+  font-size: 1.08rem;
+  margin-top: 0.15rem;
 }
 
 @media (max-width: 900px) {
