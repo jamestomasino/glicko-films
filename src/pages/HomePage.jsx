@@ -70,6 +70,15 @@ export default function HomePage() {
         <p className="c-page-subtitle">Showing {films.length} of {total || '...'} films.</p>
       </header>
 
+      <div className="film-columns-head">
+        <span className="col-head col-head-left">Rank</span>
+        <span />
+        <span className="col-head col-head-left">Title</span>
+        <span className="col-head">Elo</span>
+        <span className="col-head">Confidence</span>
+        <span className="col-head">Matches</span>
+      </div>
+
       <ol className="film-list c-card">
         {films.map((film) => (
           <li key={film.id} className="film-row">
@@ -94,13 +103,22 @@ export default function HomePage() {
               <div className="title">{film.title}</div>
               <div className="subline">
                 {film.year ? <span className="year">{film.year}</span> : null}
-                <span className="elo">Elo {film.elo}</span>
-                <span className="metric">
-                  <span className="metric-mobile">{toConfidence(film.rd)}%</span>
-                  <span className="metric-desktop">{toConfidence(film.rd)}% (RD {displayRd(film.rd)})</span>
-                </span>
-                <span className="metric">{film.matches || 0} matches</span>
               </div>
+            </div>
+
+            <div className="film-stat">
+              <span className="film-stat-mobile-label">Elo</span>
+              <span className="film-stat-value">{film.elo}</span>
+            </div>
+
+            <div className="film-stat">
+              <span className="film-stat-mobile-label">Confidence</span>
+              <span className={`film-stat-value ${confidenceClass(film.rd)}`}>{toConfidence(film.rd)}% (RD {displayRd(film.rd)})</span>
+            </div>
+
+            <div className="film-stat">
+              <span className="film-stat-mobile-label">Matches</span>
+              <span className="film-stat-value">{film.matches || 0}</span>
             </div>
           </li>
         ))}
@@ -124,4 +142,11 @@ function toConfidence(rd) {
   const normalizedRd = displayRd(rd)
   const confidence = (1 - Math.max(0, Math.min(1, (normalizedRd - 50) / 250))) * 100
   return Math.round(confidence)
+}
+
+function confidenceClass(rd) {
+  const confidence = toConfidence(rd)
+  if (confidence >= 85) return 'confidence-high'
+  if (confidence >= 70) return 'confidence-medium'
+  return 'confidence-low'
 }
