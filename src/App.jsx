@@ -8,7 +8,7 @@ import AboutPage from './pages/AboutPage'
 
 function AppNav({ hasSession }) {
   const location = useLocation()
-  if (!hasSession || location.pathname === '/') return null
+  if (!hasSession || location.pathname === '/' || location.pathname === '/about') return null
 
   return (
     <nav className="site-nav" aria-label="Primary">
