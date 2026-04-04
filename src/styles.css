@@ -30,6 +30,8 @@
   --c-danger: #b91c1c;
   --c-success: #0f766e;
   --c-shadow: 0 16px 38px -28px rgba(15, 23, 42, 0.38);
+  --c-header-bg-a: rgba(255, 255, 255, 0.98);
+  --c-header-bg-b: rgba(247, 251, 255, 0.98);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -61,6 +63,8 @@
     --c-poster-bg-a: #132034;
     --c-poster-bg-b: #1a2a43;
     --c-shadow: 0 22px 48px -32px rgba(0, 0, 0, 0.75);
+    --c-header-bg-a: rgba(12, 23, 41, 0.96);
+    --c-header-bg-b: rgba(9, 18, 33, 0.96);
   }
 }
 
@@ -97,6 +101,8 @@
   --c-poster-bg-a: #132034;
   --c-poster-bg-b: #1a2a43;
   --c-shadow: 0 22px 48px -32px rgba(0, 0, 0, 0.75);
+  --c-header-bg-a: rgba(12, 23, 41, 0.96);
+  --c-header-bg-b: rgba(9, 18, 33, 0.96);
 }
 
 * {
@@ -220,7 +226,7 @@ a:hover {
 
 .c-page-header {
   border: 1px solid var(--c-border);
-  background: linear-gradient(170deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.98));
+  background: linear-gradient(170deg, var(--c-header-bg-a), var(--c-header-bg-b));
   border-radius: 0.9rem;
   box-shadow: var(--c-shadow);
   padding: 1rem 1.15rem;
