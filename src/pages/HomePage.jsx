@@ -95,6 +95,11 @@ export default function HomePage() {
               <div className="subline">
                 {film.year ? <span className="year">{film.year}</span> : null}
                 <span className="elo">Elo {film.elo}</span>
+                <span className="metric">
+                  <span className="metric-mobile">{toConfidence(film.rd)}%</span>
+                  <span className="metric-desktop">{toConfidence(film.rd)}% (RD {displayRd(film.rd)})</span>
+                </span>
+                <span className="metric">{film.matches || 0} matches</span>
               </div>
             </div>
           </li>
@@ -108,4 +113,15 @@ export default function HomePage() {
       {!loading && !error && !hasMore && films.length > 0 ? <p className="status">End of list.</p> : null}
     </div>
   )
+}
+
+function displayRd(rd) {
+  if (!Number.isFinite(Number(rd))) return 200
+  return Math.max(50, Math.min(300, Math.round(Number(rd))))
+}
+
+function toConfidence(rd) {
+  const normalizedRd = displayRd(rd)
+  const confidence = (1 - Math.max(0, Math.min(1, (normalizedRd - 50) / 250))) * 100
+  return Math.round(confidence)
 }

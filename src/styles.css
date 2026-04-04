@@ -491,6 +491,20 @@ a:hover {
   padding: 0.15rem 0.46rem;
 }
 
+.metric {
+  border: 1px solid var(--c-border);
+  border-radius: 999px;
+  color: var(--c-text-muted);
+  background: var(--c-surface-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.15rem 0.46rem;
+}
+
+.metric-mobile {
+  display: none;
+}
+
 .status {
   text-align: center;
   color: var(--c-text-soft);
@@ -780,6 +794,18 @@ a:hover {
   .year,
   .elo {
     font-size: 0.73rem;
+  }
+
+  .metric {
+    font-size: 0.73rem;
+  }
+
+  .metric-desktop {
+    display: none;
+  }
+
+  .metric-mobile {
+    display: inline;
   }
 
   .result-row {

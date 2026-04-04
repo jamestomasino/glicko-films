@@ -10,19 +10,37 @@ exports.handler = async (event) => {
     const offset = clampInt(event.queryStringParameters?.offset, 0, 0, Number.MAX_SAFE_INTEGER)
 
     const films = await sql.query(
-      `with ranked as (
+      `with match_counts as (
         select
-          id,
-          title,
-          year,
-          tmdb_id,
-          poster_thumb_blob_key,
-          poster_cover_blob_key,
-          coalesce(glicko_rating, elo_seed, 1500) as rating_value,
+          film_id,
+          count(*)::int as matches_count
+        from (
+          select film_low_id as film_id
+          from score_matches
+          where rated_at is not null
+          union all
+          select film_high_id as film_id
+          from score_matches
+          where rated_at is not null
+        ) paired
+        group by film_id
+      ),
+      ranked as (
+        select
+          f.id,
+          f.title,
+          f.year,
+          f.tmdb_id,
+          f.poster_thumb_blob_key,
+          f.poster_cover_blob_key,
+          coalesce(f.glicko_rating, f.elo_seed, 1500) as rating_value,
+          f.glicko_rd,
+          coalesce(mc.matches_count, 0) as matches_count,
           row_number() over (
-            order by coalesce(glicko_rating, elo_seed, 1500) desc, title asc, id asc
+            order by coalesce(f.glicko_rating, f.elo_seed, 1500) desc, f.title asc, f.id asc
           ) as position
-        from films
+        from films f
+        left join match_counts mc on mc.film_id = f.id
       )
       select
         id,
@@ -32,6 +50,8 @@ exports.handler = async (event) => {
         poster_thumb_blob_key,
         poster_cover_blob_key,
         rating_value,
+        glicko_rd,
+        matches_count,
         position
       from ranked
       order by position asc
@@ -46,6 +66,8 @@ exports.handler = async (event) => {
       title: film.title,
       year: film.year ? Number(film.year) : null,
       elo: Math.round(Number(film.rating_value || 1500)),
+      rd: film.glicko_rd ? Math.round(Number(film.glicko_rd)) : null,
+      matches: Number(film.matches_count || 0),
       tmdbId: film.tmdb_id ? Number(film.tmdb_id) : null,
       tmdbUrl: film.tmdb_id ? `https://www.themoviedb.org/movie/${film.tmdb_id}` : null,
       thumbnailUrl: film.poster_thumb_blob_key
