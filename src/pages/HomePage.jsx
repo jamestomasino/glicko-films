@@ -146,7 +146,9 @@ function toConfidence(rd) {
 
 function confidenceClass(rd) {
   const confidence = toConfidence(rd)
-  if (confidence >= 85) return 'confidence-high'
+  if (confidence >= 90) return 'confidence-very-high'
+  if (confidence >= 80) return 'confidence-high'
   if (confidence >= 70) return 'confidence-medium'
-  return 'confidence-low'
+  if (confidence >= 60) return 'confidence-low'
+  return 'confidence-very-low'
 }
