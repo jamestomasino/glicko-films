@@ -231,12 +231,18 @@ a:hover {
   top: 0;
   z-index: 30;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
   padding: 0.55rem 0.9rem;
   border-bottom: 1px solid var(--c-nav-border);
   background: var(--c-nav-bg);
   backdrop-filter: blur(10px);
+}
+
+.site-nav-spacer {
+  flex: 1;
+  min-width: 0;
 }
 
 .site-nav a {
@@ -255,6 +261,10 @@ a:hover {
   color: #ffffff;
   background: linear-gradient(180deg, #14b8a6, #0f766e);
   border-color: #0f766e;
+}
+
+.site-nav-logout {
+  white-space: nowrap;
 }
 
 .c-shell {
@@ -397,6 +407,10 @@ a:hover {
 .about-page {
   display: grid;
   gap: 1rem;
+}
+
+.score-page {
+  overflow-x: clip;
 }
 
 .rankings-page .c-page-header {
@@ -802,6 +816,12 @@ a:hover {
   color: var(--c-text-soft);
 }
 
+.admin-page code,
+.admin-page a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .callback-card {
   max-width: 42rem;
 }
@@ -838,24 +858,35 @@ a:hover {
   }
 
   .battle-grid {
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 0.35rem;
     align-items: center;
   }
 
+  .battle-grid > * {
+    min-width: 0;
+  }
+
   .film-card {
-    padding: 0.38rem;
+    padding: 0;
     gap: 0.35rem;
+  }
+
+  .poster-pick {
+    width: 100%;
+    display: block;
+  }
+
+  .film-poster,
+  .film-card .poster-fallback {
+    width: 100%;
+    max-width: none;
   }
 
   .film-title {
     font-size: 0.76rem;
     line-height: 1.1;
-  }
-
-  .film-poster,
-  .film-card .poster-fallback {
-    width: min(43vw, 8.9rem);
+    padding: 0 0.32rem 0.34rem;
   }
 
   .draw-btn {
@@ -962,11 +993,24 @@ a:hover {
     align-items: flex-start;
     flex-direction: column;
   }
+
+  .site-nav {
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+
+  .site-nav-spacer {
+    display: none;
+  }
+
+  .site-nav-logout {
+    margin-left: auto;
+  }
 }
 
 @media (max-width: 420px) {
   .film-poster,
   .film-card .poster-fallback {
-    width: min(42vw, 8.2rem);
+    width: 100%;
   }
 }

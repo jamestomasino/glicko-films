@@ -24,9 +24,24 @@ export default function AdminPage() {
     void checkSession()
   }, [])
 
+  useEffect(() => {
+    const handleAuthChanged = () => { void checkSession() }
+    window.addEventListener('score-auth-changed', handleAuthChanged)
+    return () => window.removeEventListener('score-auth-changed', handleAuthChanged)
+  }, [])
+
   async function checkSession() {
     const response = await fetch('/api/score/session', { credentials: 'include' })
-    if (!response.ok) return
+    if (!response.ok) {
+      setAuthenticated(false)
+      setHealth(null)
+      setTraktStatus(null)
+      setJobs([])
+      setDeviceAuth({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
+      setSearchResults([])
+      setMaintSearchResults([])
+      return
+    }
     const payload = await response.json()
     const session = Boolean(payload.authenticated)
     setAuthenticated(session)
@@ -34,7 +49,15 @@ export default function AdminPage() {
       await loadHealth()
       await loadTraktStatus()
       await loadJobs()
+      return
     }
+    setAuthenticated(false)
+    setHealth(null)
+    setTraktStatus(null)
+    setJobs([])
+    setDeviceAuth({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
+    setSearchResults([])
+    setMaintSearchResults([])
   }
 
   async function runAction(fn) {
@@ -73,22 +96,6 @@ export default function AdminPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  async function logout() {
-    await fetch('/api/score/logout', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'x-film-write-intent': '1' }
-    })
-    setAuthenticated(false)
-    setHealth(null)
-    setTraktStatus(null)
-    setJobs([])
-    setDeviceAuth({ deviceCode: '', userCode: '', verificationUrlComplete: '' })
-    setSearchResults([])
-    setMaintSearchResults([])
-    window.dispatchEvent(new Event('score-auth-changed'))
   }
 
   async function loadHealth() {
@@ -343,10 +350,7 @@ export default function AdminPage() {
 
   return (
     <div className="c-shell admin-page">
-      <header className="c-page-header admin-header">
-        <h1>Admin Tools</h1>
-        <button className="c-button-quiet" disabled={loading} onClick={logout}>Logout</button>
-      </header>
+      <header className="c-page-header admin-header"><h1>Admin Tools</h1></header>
 
       <section className="c-card admin-card">
         <div className="c-card-header">

@@ -22,15 +22,37 @@ export default function ScorePage() {
     void checkSession()
   }, [])
 
+  useEffect(() => {
+    const handleAuthChanged = () => { void checkSession() }
+    window.addEventListener('score-auth-changed', handleAuthChanged)
+    return () => window.removeEventListener('score-auth-changed', handleAuthChanged)
+  }, [])
+
   async function checkSession() {
     const response = await fetch('/api/score/session', { credentials: 'include' })
-    if (!response.ok) return
+    if (!response.ok) {
+      setAuthenticated(false)
+      setState(null)
+      return
+    }
     const payload = await response.json()
     const session = Boolean(payload.authenticated)
     setAuthenticated(session)
     if (session) {
       await loadState()
+      return
     }
+    setState(null)
+    setPassword('')
+    setStartPairing('swiss')
+    setStartBand('normal')
+    setStartRange('random')
+    setStartRdProfile('balanced')
+    setStartPoolGoal('hybrid')
+    setStartFreshnessBias('mild')
+    setStartMinUncertaintyShare('quarter')
+    setStartMatchBudget('standard')
+    setStartUpsetFocus('off')
   }
 
   async function login(event) {
@@ -162,27 +184,6 @@ export default function ScorePage() {
     setStartUpsetFocus(resolveStartValue(state?.startOptions?.upsetFocus || [], '', defaults.upsetFocus, 'off'))
   }
 
-  async function logout() {
-    await fetch('/api/score/logout', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'x-film-write-intent': '1' }
-    })
-    setAuthenticated(false)
-    setState(null)
-    setPassword('')
-    setStartPairing('swiss')
-    setStartBand('normal')
-    setStartRange('random')
-    setStartRdProfile('balanced')
-    setStartPoolGoal('hybrid')
-    setStartFreshnessBias('mild')
-    setStartMinUncertaintyShare('quarter')
-    setStartMatchBudget('standard')
-    setStartUpsetFocus('off')
-    window.dispatchEvent(new Event('score-auth-changed'))
-  }
-
   if (!authenticated) {
     return (
       <div className="c-shell score-page">
@@ -206,10 +207,7 @@ export default function ScorePage() {
     <div className="c-shell score-page">
       <section className="battle-panel">
         <header className="c-page-header battle-header">
-          <div className="battle-header-row">
-            <h1>Head-to-Head Scoring</h1>
-            <button className="c-button-quiet" disabled={loading} onClick={logout}>Logout</button>
-          </div>
+          <div className="battle-header-row"><h1>Head-to-Head Scoring</h1></div>
           {state?.matchup ? <p className="c-page-subtitle">Tournament #{state?.tournament?.id} · {state?.pendingCount} matches remaining · {strategyLabel(state?.tournament?.strategy)}</p> : null}
           {!state?.matchup && state?.justCompleted ? <p className="c-page-subtitle">Tournament #{state?.tournament?.id} complete. Ratings applied.</p> : null}
           {!state?.matchup && !state?.justCompleted ? <p className="c-page-subtitle">No active tournament.</p> : null}
@@ -245,7 +243,10 @@ export default function ScorePage() {
             <section className="c-card start-panel">
               <div className="c-card-header"><h2>Start Tournament</h2></div>
               <div className="c-card-body">
-                <p className="c-page-subtitle">Choose pairing, Elo sampling profile, and match pacing.</p>
+                <div className="start-actions">
+                  <button className="c-button" disabled={loading} onClick={startTournament}>Begin Tournament</button>
+                  <button className="c-button-quiet" disabled={loading} onClick={resetTournamentSettings}>Reset to Defaults</button>
+                </div>
                 <div className="mode-grid">
                   <div className="mode-group">
                     <h3>Pairing</h3>
@@ -345,10 +346,6 @@ export default function ScorePage() {
                       </label>
                     ))}
                   </div>
-                </div>
-                <div className="start-actions">
-                  <button className="c-button" disabled={loading} onClick={startTournament}>Begin Tournament</button>
-                  <button className="c-button-quiet" disabled={loading} onClick={resetTournamentSettings}>Reset to Defaults</button>
                 </div>
               </div>
             </section>
