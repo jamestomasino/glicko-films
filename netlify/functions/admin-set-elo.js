@@ -1,42 +1,42 @@
 const { requireAdmin } = require('./_admin-guard')
 const { getSql, formatFilm } = require('./_film-admin-core')
+const { noStoreJsonResponse, withErrorHandling } = require('./_http')
 
 const RESET_RD = 200
 const RESET_VOLATILITY = 0.06
 const ELO_MIN = 600
 const ELO_MAX = 3000
 
-exports.handler = async (event) => {
+exports.handler = withErrorHandling(async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 30, windowMs: 60_000 })
   if (denied) return denied
 
-  try {
-    const body = JSON.parse(event.body || '{}')
-    const filmId = Number(body.filmId)
-    const tmdbId = Number(body.tmdbId)
-    const elo = Number(body.elo)
+  const body = JSON.parse(event.body || '{}')
+  const filmId = Number(body.filmId)
+  const tmdbId = Number(body.tmdbId)
+  const elo = Number(body.elo)
 
-    if (!Number.isFinite(elo)) {
-      return jsonResponse(400, { error: 'elo must be a number.' })
-    }
-    const manualElo = Math.round(elo)
-    if (!Number.isInteger(manualElo) || manualElo < ELO_MIN || manualElo > ELO_MAX) {
-      return jsonResponse(400, { error: `elo must be between ${ELO_MIN} and ${ELO_MAX}.` })
-    }
+  if (!Number.isFinite(elo)) {
+    return noStoreJsonResponse(400, { error: 'elo must be a number.' })
+  }
+  const manualElo = Math.round(elo)
+  if (!Number.isInteger(manualElo) || manualElo < ELO_MIN || manualElo > ELO_MAX) {
+    return noStoreJsonResponse(400, { error: `elo must be between ${ELO_MIN} and ${ELO_MAX}.` })
+  }
 
-    const sql = getSql()
-    let film
-    if (Number.isInteger(filmId) && filmId > 0) {
-      ;[film] = await sql.query('select * from films where id = $1 limit 1', [filmId])
-    } else if (Number.isInteger(tmdbId) && tmdbId > 0) {
-      ;[film] = await sql.query('select * from films where tmdb_id = $1 limit 1', [tmdbId])
-    } else {
-      return jsonResponse(400, { error: 'filmId or tmdbId is required.' })
-    }
+  const sql = getSql()
+  let film
+  if (Number.isInteger(filmId) && filmId > 0) {
+    ;[film] = await sql.query('select * from films where id = $1 limit 1', [filmId])
+  } else if (Number.isInteger(tmdbId) && tmdbId > 0) {
+    ;[film] = await sql.query('select * from films where tmdb_id = $1 limit 1', [tmdbId])
+  } else {
+    return noStoreJsonResponse(400, { error: 'filmId or tmdbId is required.' })
+  }
 
-    if (!film) {
-      return jsonResponse(404, { error: 'Film not found.' })
-    }
+  if (!film) {
+    return noStoreJsonResponse(404, { error: 'Film not found.' })
+  }
 
     const deletedMatches = await sql.query(
       `delete from score_matches
@@ -73,25 +73,13 @@ exports.handler = async (event) => {
       [manualElo, RESET_RD, RESET_VOLATILITY, film.id]
     )
 
-    const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
-    console.info('admin-set-elo success', { filmId: film.id, tmdbId: film.tmdb_id || null, elo: manualElo, deletedMatches: deletedMatches.length })
+  const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
+  console.info('admin-set-elo success', { filmId: film.id, tmdbId: film.tmdb_id || null, elo: manualElo, deletedMatches: deletedMatches.length })
 
-    return jsonResponse(200, {
-      ok: true,
-      film: formatFilm(updated),
-      elo: manualElo,
-      deletedMatchCount: deletedMatches.length
-    })
-  } catch (error) {
-    console.error('admin-set-elo failed', { message: error.message })
-    return jsonResponse(500, { error: 'Failed to set Elo.', detail: error.message })
-  }
-}
-
-function jsonResponse (statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    body: JSON.stringify(body)
-  }
-}
+  return noStoreJsonResponse(200, {
+    ok: true,
+    film: formatFilm(updated),
+    elo: manualElo,
+    deletedMatchCount: deletedMatches.length
+  })
+}, { source: 'admin-set-elo', message: 'Failed to set Elo.', noStore: true })

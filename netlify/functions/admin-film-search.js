@@ -1,21 +1,21 @@
 const { requireAdmin } = require('./_admin-guard')
 const { getSql, formatFilm } = require('./_film-admin-core')
+const { noStoreJsonResponse, withErrorHandling } = require('./_http')
 
-exports.handler = async (event) => {
+exports.handler = withErrorHandling(async (event) => {
   const denied = requireAdmin(event, { method: 'GET', limit: 60, windowMs: 60_000 })
   if (denied) return denied
 
-  try {
-    const query = String(event.queryStringParameters?.q || '').trim()
-    const limit = clampInt(event.queryStringParameters?.limit, 20, 1, 50)
-    if (!query) {
-      return jsonResponse(200, { ok: true, items: [] })
-    }
+  const query = String(event.queryStringParameters?.q || '').trim()
+  const limit = clampInt(event.queryStringParameters?.limit, 20, 1, 50)
+  if (!query) {
+    return noStoreJsonResponse(200, { ok: true, items: [] })
+  }
 
-    const sql = getSql()
-    const like = `%${query}%`
-    const rows = await sql.query(
-      `with match_counts as (
+  const sql = getSql()
+  const like = `%${query}%`
+  const rows = await sql.query(
+    `with match_counts as (
         select
           film_id,
           count(*)::int as matches_count
@@ -47,31 +47,19 @@ exports.handler = async (event) => {
         f.title asc,
         f.id asc
       limit $3`,
-      [query, like, limit]
-    )
+    [query, like, limit]
+  )
 
-    const items = rows.map((row) => ({
-      ...formatFilm(row),
-      matches: Number(row.matches_count || 0)
-    }))
+  const items = rows.map((row) => ({
+    ...formatFilm(row),
+    matches: Number(row.matches_count || 0)
+  }))
 
-    return jsonResponse(200, { ok: true, items })
-  } catch (error) {
-    console.error('admin-film-search failed', { message: error.message })
-    return jsonResponse(500, { error: 'Failed to search films.', detail: error.message })
-  }
-}
+  return noStoreJsonResponse(200, { ok: true, items })
+}, { source: 'admin-film-search', message: 'Failed to search films.', noStore: true })
 
 function clampInt (value, fallback, min, max) {
   const parsed = Number.parseInt(String(value), 10)
   if (Number.isNaN(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
-}
-
-function jsonResponse (statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    body: JSON.stringify(body)
-  }
 }

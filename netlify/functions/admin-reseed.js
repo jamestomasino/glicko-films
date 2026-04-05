@@ -1,44 +1,44 @@
 const { requireAdmin } = require('./_admin-guard')
 const { getSql, fetchTmdbMovie, seedFromRating, formatFilm } = require('./_film-admin-core')
+const { noStoreJsonResponse, withErrorHandling } = require('./_http')
 
-exports.handler = async (event) => {
+exports.handler = withErrorHandling(async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 30, windowMs: 60_000 })
   if (denied) return denied
 
   const token = process.env.TMDB_API_ACCESS_TOKEN
   if (!token) {
-    return jsonResponse(500, { error: 'TMDB_API_ACCESS_TOKEN is not configured.' })
+    return noStoreJsonResponse(500, { error: 'TMDB_API_ACCESS_TOKEN is not configured.' })
   }
 
-  try {
-    const body = JSON.parse(event.body || '{}')
-    const filmId = Number(body.filmId)
-    const tmdbId = Number(body.tmdbId)
-    const resetGlicko = Boolean(body.resetGlicko)
+  const body = JSON.parse(event.body || '{}')
+  const filmId = Number(body.filmId)
+  const tmdbId = Number(body.tmdbId)
+  const resetGlicko = Boolean(body.resetGlicko)
 
-    const sql = getSql()
-    let film
-    if (Number.isInteger(filmId) && filmId > 0) {
-      ;[film] = await sql.query('select * from films where id = $1 limit 1', [filmId])
-    } else if (Number.isInteger(tmdbId) && tmdbId > 0) {
-      ;[film] = await sql.query('select * from films where tmdb_id = $1 limit 1', [tmdbId])
-    }
+  const sql = getSql()
+  let film
+  if (Number.isInteger(filmId) && filmId > 0) {
+    ;[film] = await sql.query('select * from films where id = $1 limit 1', [filmId])
+  } else if (Number.isInteger(tmdbId) && tmdbId > 0) {
+    ;[film] = await sql.query('select * from films where tmdb_id = $1 limit 1', [tmdbId])
+  }
 
-    if (!film) {
-      return jsonResponse(404, { error: 'Film not found.' })
-    }
-    if (!film.tmdb_id) {
-      return jsonResponse(400, { error: 'Film has no TMDb ID.' })
-    }
+  if (!film) {
+    return noStoreJsonResponse(404, { error: 'Film not found.' })
+  }
+  if (!film.tmdb_id) {
+    return noStoreJsonResponse(400, { error: 'Film has no TMDb ID.' })
+  }
 
-    const tmdbMovie = await fetchTmdbMovie(film.tmdb_id, token)
-    if (!tmdbMovie) {
-      return jsonResponse(404, { error: 'TMDb movie not found.' })
-    }
+  const tmdbMovie = await fetchTmdbMovie(film.tmdb_id, token)
+  if (!tmdbMovie) {
+    return noStoreJsonResponse(404, { error: 'TMDb movie not found.' })
+  }
 
-    const voteAverage = Number.isFinite(Number(tmdbMovie.vote_average)) ? Number(tmdbMovie.vote_average) : 6.5
-    const voteCount = Number.isInteger(Number(tmdbMovie.vote_count)) ? Number(tmdbMovie.vote_count) : 0
-    const seed = seedFromRating(voteAverage, voteCount)
+  const voteAverage = Number.isFinite(Number(tmdbMovie.vote_average)) ? Number(tmdbMovie.vote_average) : 6.5
+  const voteCount = Number.isInteger(Number(tmdbMovie.vote_count)) ? Number(tmdbMovie.vote_count) : 0
+  const seed = seedFromRating(voteAverage, voteCount)
 
     await sql.query(
       `update films
@@ -74,25 +74,13 @@ exports.handler = async (event) => {
       ]
     )
 
-    const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
+  const [updated] = await sql.query('select * from films where id = $1 limit 1', [film.id])
 
-    console.info('admin-reseed success', { filmId: film.id, tmdbId: film.tmdb_id, resetGlicko })
+  console.info('admin-reseed success', { filmId: film.id, tmdbId: film.tmdb_id, resetGlicko })
 
-    return jsonResponse(200, {
-      ok: true,
-      resetGlicko,
-      film: formatFilm(updated)
-    })
-  } catch (error) {
-    console.error('admin-reseed failed', { message: error.message })
-    return jsonResponse(500, { error: 'Failed to reseed film.', detail: error.message })
-  }
-}
-
-function jsonResponse (statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    body: JSON.stringify(body)
-  }
-}
+  return noStoreJsonResponse(200, {
+    ok: true,
+    resetGlicko,
+    film: formatFilm(updated)
+  })
+}, { source: 'admin-reseed', message: 'Failed to reseed film.', noStore: true })

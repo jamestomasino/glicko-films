@@ -1,34 +1,29 @@
 const { requireAdmin } = require('./_admin-guard')
 const { requestDeviceCode, getTraktConfig } = require('./_trakt-core')
 const { reportError } = require('./_alerts')
+const { noStoreJsonResponse, withErrorHandling } = require('./_http')
 
-exports.handler = async (event) => {
+exports.handler = withErrorHandling(async (event) => {
   const denied = requireAdmin(event, { method: 'POST', limit: 20, windowMs: 60_000 })
   if (denied) return denied
 
-  try {
-    const config = getTraktConfig()
-    const payload = await requestDeviceCode()
+  const config = getTraktConfig()
+  const payload = await requestDeviceCode()
 
-    return jsonResponse(200, {
-      deviceCode: payload.device_code,
-      userCode: payload.user_code,
-      verificationUrl: payload.verification_url,
-      verificationUrlComplete: `${payload.verification_url}/${payload.user_code}`,
-      expiresIn: Number(payload.expires_in) || 0,
-      interval: Number(payload.interval) || 5,
-      redirectUri: config.redirectUri
-    })
-  } catch (error) {
+  return noStoreJsonResponse(200, {
+    deviceCode: payload.device_code,
+    userCode: payload.user_code,
+    verificationUrl: payload.verification_url,
+    verificationUrlComplete: `${payload.verification_url}/${payload.user_code}`,
+    expiresIn: Number(payload.expires_in) || 0,
+    interval: Number(payload.interval) || 5,
+    redirectUri: config.redirectUri
+  })
+}, {
+  source: 'admin-trakt-auth-start',
+  message: 'Failed to start Trakt auth.',
+  noStore: true,
+  onError: async (error) => {
     await reportError({ source: 'admin-trakt-auth-start', error })
-    return jsonResponse(500, { error: 'Failed to start Trakt auth.', detail: error.message })
   }
-}
-
-function jsonResponse (statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
-    body: JSON.stringify(body)
-  }
-}
+})

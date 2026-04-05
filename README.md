@@ -80,7 +80,22 @@ Optional:
 - `TRAKT_SYNC_PAGE_SIZE` (default `100`, max `100`)
 - `TRAKT_HTTP_USER_AGENT`
 - `JOB_SCHEDULED_BATCH_LIMIT` (default `3`)
+- `JOB_SCHEDULED_SECRET` (required to authorize scheduled job execution)
 - `ALERT_WEBHOOK_URL`
+
+### Secret Generation
+
+Generate high-entropy secrets with:
+
+- `openssl rand -hex 32`
+
+Use unique generated values (do not reuse the same one) for:
+
+- `SCORE_SESSION_SECRET`
+- `TRAKT_OAUTH_STATE_SECRET`
+- `JOB_SCHEDULED_SECRET`
+
+And keep them unique per environment (dev/staging/prod).
 
 ## Scripts
 

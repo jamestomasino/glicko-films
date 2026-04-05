@@ -1,13 +1,13 @@
 const { neon } = require('@netlify/neon')
+const { jsonResponse, withErrorHandling } = require('./_http')
 
 const DEFAULT_LIMIT = 100
 const MAX_LIMIT = 100
 
-exports.handler = async (event) => {
-  try {
-    const sql = neon()
-    const limit = clampInt(event.queryStringParameters?.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
-    const offset = clampInt(event.queryStringParameters?.offset, 0, 0, Number.MAX_SAFE_INTEGER)
+exports.handler = withErrorHandling(async (event) => {
+  const sql = neon()
+  const limit = clampInt(event.queryStringParameters?.limit, DEFAULT_LIMIT, 1, MAX_LIMIT)
+  const offset = clampInt(event.queryStringParameters?.offset, 0, 0, Number.MAX_SAFE_INTEGER)
 
     const films = await sql.query(
       `with match_counts as (
@@ -78,34 +78,17 @@ exports.handler = async (event) => {
         : null
     }))
 
-    return jsonResponse(200, {
-      items,
-      offset,
-      limit,
-      total: totals.total,
-      hasMore: offset + items.length < totals.total
-    })
-  } catch (error) {
-    return jsonResponse(500, {
-      error: 'Failed to load films.',
-      detail: error.message
-    })
-  }
-}
+  return jsonResponse(200, {
+    items,
+    offset,
+    limit,
+    total: totals.total,
+    hasMore: offset + items.length < totals.total
+  }, { 'cache-control': 'public, max-age=60' })
+}, { source: 'films', message: 'Failed to load films.' })
 
 function clampInt (value, fallback, min, max) {
   const parsed = Number.parseInt(value, 10)
   if (Number.isNaN(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
-}
-
-function jsonResponse (statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      'content-type': 'application/json; charset=utf-8',
-      'cache-control': 'public, max-age=60'
-    },
-    body: JSON.stringify(body)
-  }
 }
