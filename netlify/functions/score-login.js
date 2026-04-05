@@ -7,6 +7,9 @@ exports.handler = withErrorHandling(async (event) => {
   if (event.httpMethod !== 'POST') {
     return jsonResponse(405, { error: 'Method not allowed.' })
   }
+  if (!process.env.SCORE_SESSION_SECRET) {
+    return jsonResponse(500, { error: 'SCORE_SESSION_SECRET is not configured.' })
+  }
   const invalidWrite = requireWriteIntent(event)
   if (invalidWrite) return invalidWrite
   const rate = isRateLimited({

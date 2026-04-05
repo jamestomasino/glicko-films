@@ -88,5 +88,5 @@ function parseCookies (cookieHeader) {
 }
 
 function getStateSecret () {
-  return process.env.TRAKT_OAUTH_STATE_SECRET || process.env.SCORE_SESSION_SECRET || process.env.SCORE_PASSWORD || ''
+  return process.env.TRAKT_OAUTH_STATE_SECRET || ''
 }

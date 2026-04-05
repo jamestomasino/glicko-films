@@ -52,7 +52,7 @@ export default function TraktCallbackPage() {
         <div className="c-card-header"><h1>Trakt Callback</h1></div>
         <div className="c-card-body">
           <p className="c-page-subtitle">This endpoint is configured for Trakt OAuth redirects.</p>
-          {code ? <p>Received code: <code>{code}</code></p> : null}
+          {code ? <p>Authorization code received.</p> : null}
           {!code && error ? <p>OAuth error: <code>{error}</code></p> : null}
           {!code && !error ? <p>No authorization code was provided in the query string.</p> : null}
           {status === 'completing' ? <p>Completing OAuth handshake...</p> : null}

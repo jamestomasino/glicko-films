@@ -72,15 +72,15 @@ Required/commonly used values:
 - `TRAKT_CLIENT_ID`
 - `TRAKT_CLIENT_SECRET`
 - `TRAKT_REDIRECT_URI`
+- `TRAKT_OAUTH_STATE_SECRET`
+- `JOB_SCHEDULED_SECRET` (required to authorize scheduled job execution)
 
 Optional:
 
-- `TRAKT_OAUTH_STATE_SECRET`
 - `TRAKT_SYNC_MAX_PAGES` (default `10`)
 - `TRAKT_SYNC_PAGE_SIZE` (default `100`, max `100`)
 - `TRAKT_HTTP_USER_AGENT`
 - `JOB_SCHEDULED_BATCH_LIMIT` (default `3`)
-- `JOB_SCHEDULED_SECRET` (required to authorize scheduled job execution)
 - `ALERT_WEBHOOK_URL`
 
 ### Secret Generation

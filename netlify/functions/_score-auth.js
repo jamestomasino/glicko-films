@@ -83,5 +83,5 @@ function parseCookies (cookieHeader) {
 }
 
 function getSessionSecret () {
-  return process.env.SCORE_SESSION_SECRET || process.env.SCORE_PASSWORD || ''
+  return process.env.SCORE_SESSION_SECRET || ''
 }
